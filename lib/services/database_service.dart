@@ -376,7 +376,8 @@ class DatabaseService {
   /// 로그아웃
   Future<void> logout() async {
     _currentUserId = null;
-    await _saveToStorage();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('currentUserId');
   }
 
   /// 데이터베이스 초기화 (관리자 전용) - 테스트 계정만 유지
