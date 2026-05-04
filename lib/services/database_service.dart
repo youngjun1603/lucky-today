@@ -39,32 +39,64 @@ class DatabaseService {
   Future<void> init() async {
     // SharedPreferences에서 데이터 로드
     await _loadFromStorage();
-    
-    // 사용자 데이터가 없으면 초기화 (최초 실행 시)
+
+    // 사용자 데이터가 없으면 최초 시드
     if (_users.isEmpty) {
       print('🔄 데이터베이스 초기화 시작... (사용자 없음)');
-      
-      // 초기 데이터 시드
       await _seedInitialData();
-      
-      // 저장
       await _saveToStorage();
-      
       _isInitialized = true;
-      print('✅ 데이터베이스 초기화 완료');
-      print('📊 사용자 수: ${_users.length}');
-      print('📊 사용자 목록: ${_users.keys.join(", ")}');
+      print('✅ 데이터베이스 초기화 완료 (사용자 수: ${_users.length})');
       return;
     }
 
-    // 사용자가 있으면 이미 초기화됨
-    if (_isInitialized && _users.isNotEmpty) {
-      print('⚠️ 데이터베이스 이미 초기화됨 (사용자 수: ${_users.length})');
-      print('📊 저장된 사용자: ${_users.keys.join(", ")}');
-      return;
+    // 사용자가 있어도 데모 계정 password 누락 여부를 항상 검사·복구
+    final repaired = await _repairDemoAccounts();
+    if (repaired) {
+      print('🔧 데모 계정 password 복구 완료');
+      await _saveToStorage();
     }
-    
+
     _isInitialized = true;
+    print('✅ 데이터베이스 준비 완료 (사용자 수: ${_users.length})');
+  }
+
+  /// 저장된 데모 계정에 password가 없을 경우 자동 복구
+  Future<bool> _repairDemoAccounts() async {
+    bool repaired = false;
+
+    final demoAccounts = {
+      'admin@demo.com': _hashPassword('admin1234'),
+      'user@demo.com':  _hashPassword('user1234'),
+    };
+
+    for (final entry in demoAccounts.entries) {
+      final email    = entry.key;
+      final pwHash   = entry.value;
+      final userData = _users[email];
+
+      if (userData == null) {
+        // 계정 자체가 없으면 새로 생성
+        final newUser = User(
+          id:       _prizeService.generateId(),
+          email:    email,
+          password: pwHash,
+          role:     email.startsWith('admin') ? 'ADMIN' : 'USER',
+          points:   100,
+        );
+        _users[email] = newUser.toJson();
+        print('🆕 데모 계정 신규 생성: $email');
+        repaired = true;
+      } else if ((userData['password'] as String? ?? '').isEmpty) {
+        // password 필드가 비어 있으면 복구
+        userData['password'] = pwHash;
+        _users[email] = userData;
+        print('🔧 데모 계정 password 복구: $email');
+        repaired = true;
+      }
+    }
+
+    return repaired;
   }
   
   /// SharedPreferences에서 데이터 로드

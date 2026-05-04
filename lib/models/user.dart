@@ -44,6 +44,7 @@ class User extends HiveObject {
   Map<String, dynamic> toJson() => {
         'id': id,
         'email': email,
+        'password': password,
         'role': role,
         'points': points,
         'drawSeq': drawSeq,

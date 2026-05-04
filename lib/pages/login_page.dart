@@ -32,10 +32,25 @@ class _LoginPageState extends State<LoginPage> {
     try {
       await _dbService.init();
       print('✅ 로그인 페이지: 데이터베이스 초기화 완료');
-      
-      // 초기화 완료 후 약간의 딜레이 (UI 안정화)
-      await Future.delayed(const Duration(milliseconds: 500));
-      
+
+      // 이미 로그인된 세션이 있으면 자동 이동 (main.dart 분기 실패 대비 보조 처리)
+      final currentUser = await _dbService.getCurrentUser();
+      if (currentUser != null && mounted) {
+        print('✅ 기존 로그인 세션 감지 → 자동 이동: ${currentUser.email}');
+        if (currentUser.role == 'ADMIN') {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const AdminPage()),
+          );
+        } else {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const LotteryPage()),
+          );
+        }
+        return;
+      }
+
+      await Future.delayed(const Duration(milliseconds: 300));
+
       if (mounted) {
         setState(() => _isInitializing = false);
       }
