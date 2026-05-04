@@ -25,6 +25,8 @@ class DatabaseService {
   static final Map<String, Map<String, dynamic>> _coupons = {};
   static String? _currentUserId;
   
+  static bool _isInitialized = false;
+
   // 시스템 설정
   static int _betPoint1 = 5;
   static int _betPoint2 = 10;
