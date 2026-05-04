@@ -207,9 +207,11 @@ class DatabaseService {
       // 쿠폰 데이터 저장
       await prefs.setString('coupons', jsonEncode(_coupons));
       
-      // 현재 사용자 ID 저장
+      // 현재 사용자 ID 저장 (null이면 반드시 삭제)
       if (_currentUserId != null) {
         await prefs.setString('currentUserId', _currentUserId!);
+      } else {
+        await prefs.remove('currentUserId');
       }
       
       // 시스템 설정 저장
@@ -376,8 +378,7 @@ class DatabaseService {
   /// 로그아웃
   Future<void> logout() async {
     _currentUserId = null;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('currentUserId');
+    await _saveToStorage();
   }
 
   /// 데이터베이스 초기화 (관리자 전용) - 테스트 계정만 유지
