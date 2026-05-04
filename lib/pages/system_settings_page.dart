@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/database_service.dart';
-import '../config/prize_config.dart';
 import '../config/app_colors.dart';
 
 class SystemSettingsPage extends StatefulWidget {

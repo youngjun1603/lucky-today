@@ -59,11 +59,6 @@ class _RouletteWidgetState extends State<RouletteWidget>
     });
   }
 
-  Color _parseColor(String hexColor) {
-    hexColor = hexColor.replaceAll('#', '');
-    return Color(int.parse('FF$hexColor', radix: 16));
-  }
-
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
