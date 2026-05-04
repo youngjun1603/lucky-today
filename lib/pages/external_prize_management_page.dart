@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../services/database_service.dart';
 import '../models/external_prize.dart';
+import '../config/app_colors.dart';
 
 class ExternalPrizeManagementPage extends StatefulWidget {
   const ExternalPrizeManagementPage({super.key});
@@ -123,7 +124,7 @@ class _ExternalPrizeManagementPageState extends State<ExternalPrizeManagementPag
               });
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.purple,
+              backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
             ),
             child: const Text('추가'),
@@ -336,7 +337,7 @@ class _ExternalPrizeManagementPageState extends State<ExternalPrizeManagementPag
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
         title: const Text('외부 경품 관리'),
-        backgroundColor: Colors.purple,
+        backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         actions: [
           IconButton(
@@ -374,7 +375,7 @@ class _ExternalPrizeManagementPageState extends State<ExternalPrizeManagementPag
                             icon: const Icon(Icons.add),
                             label: const Text('첫 경품 등록하기'),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.purple,
+                              backgroundColor: AppColors.primary,
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 24,
@@ -412,8 +413,8 @@ class _ExternalPrizeManagementPageState extends State<ExternalPrizeManagementPag
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
                                   colors: isOutOfStock
-                                      ? [Colors.grey[400]!, Colors.grey[600]!]
-                                      : [Colors.purple[400]!, Colors.pink[400]!],
+                                      ? [AppColors.textHint, AppColors.textSecondary]
+                                      : [AppColors.primary, AppColors.secondary],
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
                                 ),
@@ -550,7 +551,7 @@ class _ExternalPrizeManagementPageState extends State<ExternalPrizeManagementPag
             ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _addPrize,
-        backgroundColor: Colors.purple,
+        backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add),
         label: const Text('경품 추가'),

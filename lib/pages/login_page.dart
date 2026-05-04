@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/database_service.dart';
+import '../services/notification_service.dart';
+import '../config/app_colors.dart';
 import 'lottery_page.dart';
 import 'admin_page.dart';
 
@@ -15,6 +17,7 @@ class _LoginPageState extends State<LoginPage> {
   final _passwordController = TextEditingController(text: 'user1234');
   final _dbService = DatabaseService();
 
+  final _notificationService = NotificationService();
   bool _isLoading = false;
   bool _isRegisterMode = false;
   bool _isInitializing = true;
@@ -22,21 +25,17 @@ class _LoginPageState extends State<LoginPage> {
   @override
   void initState() {
     super.initState();
-    // 로그인 페이지 로드 시 데이터베이스 초기화
     _initDatabase();
   }
 
   Future<void> _initDatabase() async {
     setState(() => _isInitializing = true);
-    
+
     try {
       await _dbService.init();
-      print('✅ 로그인 페이지: 데이터베이스 초기화 완료');
 
-      // 이미 로그인된 세션이 있으면 자동 이동 (main.dart 분기 실패 대비 보조 처리)
       final currentUser = await _dbService.getCurrentUser();
       if (currentUser != null && mounted) {
-        print('✅ 기존 로그인 세션 감지 → 자동 이동: ${currentUser.email}');
         if (currentUser.role == 'ADMIN') {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(builder: (_) => const AdminPage()),
@@ -51,14 +50,9 @@ class _LoginPageState extends State<LoginPage> {
 
       await Future.delayed(const Duration(milliseconds: 300));
 
-      if (mounted) {
-        setState(() => _isInitializing = false);
-      }
+      if (mounted) setState(() => _isInitializing = false);
     } catch (e) {
-      print('❌ 로그인 페이지: 데이터베이스 초기화 실패 - $e');
-      if (mounted) {
-        setState(() => _isInitializing = false);
-      }
+      if (mounted) setState(() => _isInitializing = false);
     }
   }
 
@@ -79,8 +73,6 @@ class _LoginPageState extends State<LoginPage> {
 
     try {
       if (_isRegisterMode) {
-        // 회원가입
-        print('🆕 회원가입 모드 시작');
         final user = await _dbService.register(
           _emailController.text,
           _passwordController.text,
@@ -92,20 +84,15 @@ class _LoginPageState extends State<LoginPage> {
           return;
         }
 
-        print('✅ 회원가입 완료, 사용자 정보: ${user.email} (${user.role})');
-        
-        // 회원가입 성공 후 로그인 상태로 페이지 이동
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('회원가입이 완료되었습니다!'),
-              backgroundColor: Colors.green,
+              backgroundColor: AppColors.secondary,
             ),
           );
-          
-          // 0.5초 후 페이지 이동 (사용자에게 알림 표시)
           await Future.delayed(const Duration(milliseconds: 500));
-          
+          await _scheduleNotification();
           if (mounted) {
             Navigator.of(context).pushReplacement(
               MaterialPageRoute(builder: (_) => const LotteryPage()),
@@ -130,6 +117,7 @@ class _LoginPageState extends State<LoginPage> {
               MaterialPageRoute(builder: (_) => const AdminPage()),
             );
           } else {
+            await _scheduleNotification();
             Navigator.of(context).pushReplacement(
               MaterialPageRoute(builder: (_) => const LotteryPage()),
             );
@@ -142,183 +130,345 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  Future<void> _scheduleNotification() async {
+    try {
+      await _notificationService.initialize();
+      final granted = await _notificationService.requestPermissions();
+      if (granted) {
+        await _notificationService.scheduleDailyFreeDrawReminder();
+      }
+    } catch (_) {}
+  }
+
   void _showError(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppColors.error,
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    // 데이터베이스 초기화 중이면 로딩 화면 표시
     if (_isInitializing) {
       return Scaffold(
-        backgroundColor: Colors.grey[100],
-        body: const Center(
+        backgroundColor: AppColors.bgPage,
+        body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              CircularProgressIndicator(),
-              SizedBox(height: 16),
+              const CircularProgressIndicator(color: AppColors.primary),
+              const SizedBox(height: 16),
               Text(
-                '데이터베이스 초기화 중...',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey,
-                ),
+                '잠시만요...',
+                style: TextStyle(fontSize: 16, color: AppColors.textSecondary),
               ),
             ],
           ),
         ),
       );
     }
-    
+
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: AppColors.bgPage,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
-            child: Card(
-              elevation: 4,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Container(
-                constraints: const BoxConstraints(maxWidth: 400),
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      '오늘의 행운',
-                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '바로 지금, 행운을 잡으세요! ✨',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.grey[600],
-                          ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 32),
-                    Row(
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 400),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 브랜드 헤더
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 32),
+                    child: Column(
                       children: [
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () => setState(() => _isRegisterMode = false),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _isRegisterMode
-                                  ? Colors.grey[200]
-                                  : Colors.black,
-                              foregroundColor:
-                                  _isRegisterMode ? Colors.black : Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
+                        Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: AppColors.goldGradient,
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
                             ),
-                            child: const Text('로그인'),
+                            borderRadius: BorderRadius.circular(24),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.primary.withOpacity(0.4),
+                                blurRadius: 20,
+                                offset: const Offset(0, 8),
+                              ),
+                            ],
+                          ),
+                          child: const Center(
+                            child: Text('🍀', style: TextStyle(fontSize: 40)),
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () => setState(() => _isRegisterMode = true),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _isRegisterMode
-                                  ? Colors.black
-                                  : Colors.grey[200],
-                              foregroundColor:
-                                  _isRegisterMode ? Colors.white : Colors.black,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                            child: const Text('회원가입'),
+                        const SizedBox(height: 20),
+                        const Text(
+                          '오늘의 행운',
+                          style: TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          '매일 새로운 행운이 당신을 기다립니다',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: AppColors.textSecondary,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 24),
-                    TextField(
-                      controller: _emailController,
-                      decoration: InputDecoration(
-                        labelText: '이메일',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        prefixIcon: const Icon(Icons.email),
+                  ),
+
+                  // 로그인 카드
+                  Card(
+                    elevation: 0,
+                    color: AppColors.bgCard,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                      side: const BorderSide(
+                        color: Color(0xFFEEEEEE),
+                        width: 1,
                       ),
-                      keyboardType: TextInputType.emailAddress,
                     ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _passwordController,
-                      decoration: InputDecoration(
-                        labelText: '비밀번호',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        prefixIcon: const Icon(Icons.lock),
-                      ),
-                      obscureText: true,
-                    ),
-                    const SizedBox(height: 24),
-                    ElevatedButton(
-                      onPressed: _isLoading ? null : _submit,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue[600],
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor:
-                                    AlwaysStoppedAnimation<Color>(Colors.white),
-                              ),
-                            )
-                          : Text(
-                              _isRegisterMode ? '회원가입' : '로그인',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // 로그인 / 회원가입 탭
+                          Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: AppColors.bgSecondary,
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                    ),
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(8),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: () => setState(
+                                        () => _isRegisterMode = false),
+                                    child: AnimatedContainer(
+                                      duration:
+                                          const Duration(milliseconds: 200),
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 10),
+                                      decoration: BoxDecoration(
+                                        color: !_isRegisterMode
+                                            ? AppColors.primary
+                                            : Colors.transparent,
+                                        borderRadius: BorderRadius.circular(10),
+                                        boxShadow: !_isRegisterMode
+                                            ? [
+                                                BoxShadow(
+                                                  color: AppColors.primary
+                                                      .withOpacity(0.3),
+                                                  blurRadius: 8,
+                                                  offset: const Offset(0, 2),
+                                                )
+                                              ]
+                                            : null,
+                                      ),
+                                      child: Text(
+                                        '로그인',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: !_isRegisterMode
+                                              ? Colors.white
+                                              : AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: () =>
+                                        setState(() => _isRegisterMode = true),
+                                    child: AnimatedContainer(
+                                      duration:
+                                          const Duration(milliseconds: 200),
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 10),
+                                      decoration: BoxDecoration(
+                                        color: _isRegisterMode
+                                            ? AppColors.primary
+                                            : Colors.transparent,
+                                        borderRadius: BorderRadius.circular(10),
+                                        boxShadow: _isRegisterMode
+                                            ? [
+                                                BoxShadow(
+                                                  color: AppColors.primary
+                                                      .withOpacity(0.3),
+                                                  blurRadius: 8,
+                                                  offset: const Offset(0, 2),
+                                                )
+                                              ]
+                                            : null,
+                                      ),
+                                      child: Text(
+                                        '회원가입',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: _isRegisterMode
+                                              ? Colors.white
+                                              : AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+
+                          TextField(
+                            controller: _emailController,
+                            decoration: InputDecoration(
+                              labelText: '이메일',
+                              labelStyle:
+                                  const TextStyle(color: AppColors.textSecondary),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                    color: Color(0xFFEEEEEE)),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                    color: Color(0xFFEEEEEE)),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                    color: AppColors.primary, width: 2),
+                              ),
+                              prefixIcon: const Icon(Icons.email_outlined,
+                                  color: AppColors.textSecondary),
+                              filled: true,
+                              fillColor: AppColors.bgSecondary,
+                            ),
+                            keyboardType: TextInputType.emailAddress,
+                          ),
+                          const SizedBox(height: 16),
+                          TextField(
+                            controller: _passwordController,
+                            decoration: InputDecoration(
+                              labelText: '비밀번호',
+                              labelStyle:
+                                  const TextStyle(color: AppColors.textSecondary),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                    color: Color(0xFFEEEEEE)),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                    color: Color(0xFFEEEEEE)),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                    color: AppColors.primary, width: 2),
+                              ),
+                              prefixIcon: const Icon(Icons.lock_outlined,
+                                  color: AppColors.textSecondary),
+                              filled: true,
+                              fillColor: AppColors.bgSecondary,
+                            ),
+                            obscureText: true,
+                          ),
+                          const SizedBox(height: 24),
+
+                          // 제출 버튼
+                          Container(
+                            height: 52,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [
+                                  AppColors.primary,
+                                  AppColors.primaryLight,
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.primary.withOpacity(0.4),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: ElevatedButton(
+                              onPressed: _isLoading ? null : _submit,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.transparent,
+                                shadowColor: Colors.transparent,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: _isLoading
+                                  ? const SizedBox(
+                                      height: 20,
+                                      width: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(
+                                            Colors.white),
+                                      ),
+                                    )
+                                  : Text(
+                                      _isRegisterMode ? '시작하기' : '행운 찾으러 가기',
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        ],
                       ),
-                      child: Text(
-                        '데모 계정:\n'
-                        'USER: user@demo.com / user1234\n'
-                        'ADMIN: admin@demo.com / admin1234',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[700],
-                        ),
+                    ),
+                  ),
+
+                  // 데모 계정 안내
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.primarySurface,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                          color: AppColors.primaryLight.withOpacity(0.5)),
+                    ),
+                    child: const Text(
+                      '데모 계정\nUSER: user@demo.com / user1234\nADMIN: admin@demo.com / admin1234',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                        height: 1.6,
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),

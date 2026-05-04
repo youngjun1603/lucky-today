@@ -28,42 +28,42 @@ const List<PrizeStructure> prizeStructure = [
     displayName: '꽝',
     probability: 40.0,
     multiplier: 0.2,
-    color: '#9E9E9E', // 회색
+    color: '#BDC3C7',
   ),
   PrizeStructure(
     range: '3-5 포인트',
     displayName: '3-5P',
     probability: 30.0,
     multiplier: 0.5,
-    color: '#2196F3', // 파란색
+    color: '#5B9CF6',
   ),
   PrizeStructure(
     range: '5-10 포인트',
     displayName: '5-10P',
     probability: 15.0,
     multiplier: 1.0,
-    color: '#4CAF50', // 녹색
+    color: '#34C98E',
   ),
   PrizeStructure(
     range: '20-50 포인트',
     displayName: '20-50P',
     probability: 10.0,
     multiplier: 4.0,
-    color: '#FF9800', // 주황색
+    color: '#F5A623',
   ),
   PrizeStructure(
     range: '100 포인트',
     displayName: '100P',
     probability: 4.0,
     multiplier: 10.0,
-    color: '#9C27B0', // 보라색
+    color: '#A55EEA',
   ),
   PrizeStructure(
     range: '500 포인트',
     displayName: 'JACKPOT',
     probability: 1.0,
     multiplier: 50.0,
-    color: '#F44336', // 빨간색
+    color: '#FF4757',
   ),
 ];
 

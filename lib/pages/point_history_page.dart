@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/database_service.dart';
 import '../models/point_transaction.dart';
+import '../config/app_colors.dart';
 
 class PointHistoryPage extends StatefulWidget {
   final String userId;
@@ -40,13 +41,13 @@ class _PointHistoryPageState extends State<PointHistoryPage> {
   Color _getStatusColor(String status) {
     switch (status) {
       case 'COMPLETED':
-        return Colors.green;
+        return AppColors.secondary;
       case 'PENDING':
-        return Colors.orange;
+        return AppColors.primary;
       case 'FAILED':
-        return Colors.red;
+        return AppColors.error;
       default:
-        return Colors.grey;
+        return AppColors.textHint;
     }
   }
 
@@ -68,7 +69,7 @@ class _PointHistoryPageState extends State<PointHistoryPage> {
   }
 
   Color _getTypeColor(String type) {
-    return type == 'CHARGE' ? Colors.green : Colors.orange;
+    return type == 'CHARGE' ? AppColors.secondary : AppColors.primary;
   }
 
   String _getTypeText(String type) {
@@ -78,10 +79,25 @@ class _PointHistoryPageState extends State<PointHistoryPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.bgPage,
       appBar: AppBar(
-        title: const Text('포인트 거래 내역'),
-        backgroundColor: Colors.purple,
+        title: const Text(
+          '포인트 거래 내역',
+          style: TextStyle(
+              fontWeight: FontWeight.bold, color: Colors.white, fontSize: 18),
+        ),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: AppColors.appBarGradient,
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+          ),
+        ),
+        backgroundColor: Colors.transparent,
         foregroundColor: Colors.white,
+        elevation: 0,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -178,8 +194,8 @@ class _PointHistoryPageState extends State<PointHistoryPage> {
                                   fontSize: 28,
                                   fontWeight: FontWeight.bold,
                                   color: transaction.type == 'CHARGE'
-                                      ? Colors.green
-                                      : Colors.orange,
+                                      ? AppColors.secondary
+                                      : AppColors.primary,
                                 ),
                               ),
                               const SizedBox(height: 8),

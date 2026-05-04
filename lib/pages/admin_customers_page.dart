@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/database_service.dart';
 import '../models/user.dart';
+import '../config/app_colors.dart';
 
 class AdminCustomersPage extends StatefulWidget {
   const AdminCustomersPage({super.key});
@@ -37,10 +38,25 @@ class _AdminCustomersPageState extends State<AdminCustomersPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.bgPage,
       appBar: AppBar(
-        title: const Text('고객 현황'),
-        backgroundColor: Colors.purple,
+        title: const Text(
+          '고객 현황',
+          style: TextStyle(
+              fontWeight: FontWeight.bold, color: Colors.white, fontSize: 18),
+        ),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: AppColors.appBarGradient,
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+          ),
+        ),
+        backgroundColor: Colors.transparent,
         foregroundColor: Colors.white,
+        elevation: 0,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -73,8 +89,8 @@ class _AdminCustomersPageState extends State<AdminCustomersPage> {
                           child: ExpansionTile(
                             leading: CircleAvatar(
                               backgroundColor: user.role == 'ADMIN'
-                                  ? Colors.red
-                                  : Colors.blue,
+                                  ? AppColors.error
+                                  : AppColors.accent,
                               child: Icon(
                                 user.role == 'ADMIN'
                                     ? Icons.admin_panel_settings
@@ -98,8 +114,8 @@ class _AdminCustomersPageState extends State<AdminCustomersPage> {
                               ),
                               decoration: BoxDecoration(
                                 color: drawCount > 0
-                                    ? Colors.green
-                                    : Colors.grey,
+                                    ? AppColors.secondary
+                                    : AppColors.textHint,
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Text(
@@ -119,33 +135,33 @@ class _AdminCustomersPageState extends State<AdminCustomersPage> {
                                     _buildDetailRow(
                                       '참여 횟수',
                                       '$drawCount회',
-                                      Colors.blue,
+                                      AppColors.accent,
                                     ),
                                     const SizedBox(height: 8),
                                     _buildDetailRow(
                                       '총 배팅 금액',
                                       '${_numberFormat.format(totalBet)}P',
-                                      Colors.orange,
+                                      AppColors.primary,
                                     ),
                                     const SizedBox(height: 8),
                                     _buildDetailRow(
                                       '총 당첨 금액',
                                       '${_numberFormat.format(totalWin)}P',
-                                      Colors.green,
+                                      AppColors.secondary,
                                     ),
                                     const SizedBox(height: 8),
                                     _buildDetailRow(
                                       '순 손익',
                                       '${totalNet >= 0 ? '+' : ''}${_numberFormat.format(totalNet)}P',
                                       totalNet >= 0
-                                          ? Colors.green
-                                          : Colors.red,
+                                          ? AppColors.secondary
+                                          : AppColors.error,
                                     ),
                                     const SizedBox(height: 8),
                                     _buildDetailRow(
                                       '외부 경품 당첨',
                                       '$externalPrizeCount회',
-                                      Colors.purple,
+                                      AppColors.prize100p,
                                     ),
                                     if (lastDrawDate != null) ...[
                                       const SizedBox(height: 8),

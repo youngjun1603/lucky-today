@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../services/database_service.dart';
 import '../models/coupon.dart';
+import '../config/app_colors.dart';
 
 class CouponBoxPage extends StatefulWidget {
   final String userId;
@@ -102,8 +103,8 @@ class _CouponBoxPageState extends State<CouponBoxPage> with SingleTickerProvider
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
-          color: isActive ? Colors.amber[700]! : Colors.grey[300]!,
-          width: 2,
+          color: isActive ? AppColors.primary : const Color(0xFFEEEEEE),
+          width: isActive ? 2 : 1,
         ),
       ),
       child: Container(
@@ -111,9 +112,9 @@ class _CouponBoxPageState extends State<CouponBoxPage> with SingleTickerProvider
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
           gradient: LinearGradient(
-            colors: isActive 
-                ? [Colors.amber[50]!, Colors.orange[50]!]
-                : [Colors.grey[100]!, Colors.grey[200]!],
+            colors: isActive
+                ? [AppColors.primarySurface, const Color(0xFFFFF8E1)]
+                : [AppColors.bgSecondary, const Color(0xFFF0F0F0)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -130,7 +131,7 @@ class _CouponBoxPageState extends State<CouponBoxPage> with SingleTickerProvider
                     children: [
                       Icon(
                         isActive ? Icons.card_giftcard : Icons.check_circle_outline,
-                        color: isActive ? Colors.orange[700] : Colors.grey[600],
+                        color: isActive ? AppColors.primary : AppColors.textHint,
                         size: 24,
                       ),
                       const SizedBox(width: 8),
@@ -140,7 +141,9 @@ class _CouponBoxPageState extends State<CouponBoxPage> with SingleTickerProvider
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
-                            color: isActive ? Colors.orange[900] : Colors.grey[700],
+                            color: isActive
+                                ? AppColors.textPrimary
+                                : AppColors.textSecondary,
                           ),
                         ),
                       ),
@@ -150,7 +153,7 @@ class _CouponBoxPageState extends State<CouponBoxPage> with SingleTickerProvider
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
-                    color: isActive ? Colors.amber[700] : Colors.grey[400],
+                    color: isActive ? AppColors.primary : AppColors.textHint,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -173,7 +176,7 @@ class _CouponBoxPageState extends State<CouponBoxPage> with SingleTickerProvider
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: isActive ? Colors.amber[700]! : Colors.grey[400]!,
+                  color: isActive ? AppColors.primaryLight : const Color(0xFFDDDDDD),
                   width: 1,
                 ),
               ),
@@ -211,7 +214,7 @@ class _CouponBoxPageState extends State<CouponBoxPage> with SingleTickerProvider
                       icon: const Icon(Icons.copy, size: 18),
                       label: const Text('복사'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.amber[700],
+                        backgroundColor: AppColors.primary,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(
                           horizontal: 16,
@@ -295,8 +298,8 @@ class _CouponBoxPageState extends State<CouponBoxPage> with SingleTickerProvider
                     );
                   },
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.orange[700],
-                    side: BorderSide(color: Colors.orange[700]!),
+                    foregroundColor: AppColors.primary,
+                    side: const BorderSide(color: AppColors.primary),
                   ),
                   child: const Text('사용 처리'),
                 ),
@@ -363,16 +366,31 @@ class _CouponBoxPageState extends State<CouponBoxPage> with SingleTickerProvider
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: AppColors.bgPage,
       appBar: AppBar(
-        title: const Text('🎁 쿠폰함'),
-        backgroundColor: Colors.amber[700],
+        title: const Text(
+          '쿠폰함',
+          style: TextStyle(
+              fontWeight: FontWeight.bold, color: Colors.white, fontSize: 18),
+        ),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: AppColors.appBarGradient,
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+          ),
+        ),
+        backgroundColor: Colors.transparent,
         foregroundColor: Colors.white,
+        elevation: 0,
         bottom: TabBar(
           controller: _tabController,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white70,
           indicatorColor: Colors.white,
+          indicatorWeight: 3,
           tabs: [
             Tab(
               child: Row(
@@ -392,8 +410,8 @@ class _CouponBoxPageState extends State<CouponBoxPage> with SingleTickerProvider
                       ),
                       child: Text(
                         '${_activeCoupons.length}',
-                        style: TextStyle(
-                          color: Colors.amber[700],
+                        style: const TextStyle(
+                          color: AppColors.primary,
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
                         ),

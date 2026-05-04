@@ -1,10 +1,11 @@
-# Flutter/Dart
-# Build outputs (exclude to save space)
+# Flutter/Dart generated files
 /build/
 /.dart_tool/
 .packages
 .pub-cache/
 .pub/
+.flutter-plugins
+.flutter-plugins-dependencies
 
 # IDE
 .vscode/
@@ -22,5 +23,11 @@ Thumbs.db
 *.tmp
 *.temp
 
-# Keep lib/ directory for source code!
+# Claude Code local settings
+.claude/
+
+# Android signing keys (never commit)
+*.jks
+*.keystore
+key.properties
 

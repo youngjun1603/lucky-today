@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'services/database_service.dart';
+import 'services/notification_service.dart';
 import 'models/user.dart';
 import 'pages/login_page.dart';
 import 'pages/lottery_page.dart';
 import 'pages/admin_page.dart';
+import 'pages/onboarding_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,7 +18,6 @@ void main() async {
   try {
     await dbService.init();
     print('✅ 데이터베이스 초기화 성공');
-    // 새로고침(F5) 후에도 로그인 상태 복원
     currentUser = await dbService.getCurrentUser();
     print(currentUser != null
         ? '✅ 로그인 상태 복원: ${currentUser.email}'
@@ -24,18 +26,44 @@ void main() async {
     print('❌ 데이터베이스 초기화 실패: $e');
   }
 
-  runApp(PointLotteryApp(initialUser: currentUser));
+  // 알림 초기화 (Android)
+  final notificationService = NotificationService();
+  try {
+    await notificationService.initialize();
+    if (currentUser != null && currentUser.role != 'ADMIN') {
+      final granted = await notificationService.requestPermissions();
+      if (granted) {
+        await notificationService.scheduleDailyFreeDrawReminder();
+      }
+    }
+  } catch (_) {}
+
+  // 온보딩 표시 여부 확인
+  final prefs = await SharedPreferences.getInstance();
+  final onboardingShown = prefs.getBool('onboarding_shown') ?? false;
+
+  runApp(PointLotteryApp(
+    initialUser: currentUser,
+    showOnboarding: !onboardingShown,
+  ));
 }
 
 class PointLotteryApp extends StatelessWidget {
   final User? initialUser;
-  const PointLotteryApp({super.key, this.initialUser});
+  final bool showOnboarding;
+
+  const PointLotteryApp({
+    super.key,
+    this.initialUser,
+    this.showOnboarding = false,
+  });
 
   @override
   Widget build(BuildContext context) {
-    // 시작 페이지: 로그인 상태이면 해당 화면으로, 아니면 로그인 페이지
     Widget home;
-    if (initialUser == null) {
+    if (showOnboarding) {
+      home = const OnboardingPage();
+    } else if (initialUser == null) {
       home = const LoginPage();
     } else if (initialUser!.role == 'ADMIN') {
       home = const AdminPage();
@@ -47,13 +75,27 @@ class PointLotteryApp extends StatelessWidget {
       title: '오늘의 행운',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.purple),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFFF5A623),
+          primary: const Color(0xFFF5A623),
+          secondary: const Color(0xFF34C98E),
+          surface: const Color(0xFFFFFDF7),
+        ),
+        scaffoldBackgroundColor: const Color(0xFFFFFDF7),
         useMaterial3: true,
         cardTheme: CardThemeData(
           elevation: 2,
+          color: const Color(0xFFFFFFFF),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
+        ),
+        progressIndicatorTheme: const ProgressIndicatorThemeData(
+          color: Color(0xFFF5A623),
+        ),
+        textSelectionTheme: const TextSelectionThemeData(
+          cursorColor: Color(0xFFF5A623),
+          selectionHandleColor: Color(0xFFF5A623),
         ),
       ),
       home: home,

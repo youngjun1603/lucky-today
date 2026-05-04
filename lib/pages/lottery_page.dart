@@ -5,7 +5,10 @@ import '../services/database_service.dart';
 import '../models/user.dart';
 import '../models/draw.dart';
 import '../config/prize_config.dart';
+import '../config/app_colors.dart';
+import 'package:share_plus/share_plus.dart';
 import '../widgets/roulette_widget.dart';
+import '../widgets/ad_reward_dialog.dart';
 import 'login_page.dart';
 import 'point_history_page.dart';
 import 'user_stats_page.dart';
@@ -30,6 +33,8 @@ class _LotteryPageState extends State<LotteryPage> {
   int _betPoint1 = 5;
   int _betPoint2 = 10;
   List<Map<String, dynamic>> _todayTopWinners = [];
+  int _remainingFreeDraws = 3;
+  int _maxFreeDraws = 3;
   bool _isLoading = false;
   bool _isInitializing = true;
   bool _isLoadingExternal = false;
@@ -42,7 +47,7 @@ class _LotteryPageState extends State<LotteryPage> {
 
   Future<void> _loadData() async {
     setState(() => _isInitializing = true);
-    
+
     final user = await _dbService.getCurrentUser();
     if (user == null) {
       if (mounted) {
@@ -57,6 +62,7 @@ class _LotteryPageState extends State<LotteryPage> {
     final drawStatus = await _dbService.getUserDailyDrawStatus(user.id);
     final settings = await _dbService.getSystemSettings();
     final topWinners = await _dbService.getTodayTopWinners(limit: 10);
+    final freeDrawStatus = await _dbService.getUserDailyFreeDrawStatus(user.id);
 
     setState(() {
       _currentUser = user;
@@ -66,20 +72,20 @@ class _LotteryPageState extends State<LotteryPage> {
       _betPoint1 = settings['betPoint1'] ?? 5;
       _betPoint2 = settings['betPoint2'] ?? 10;
       _todayTopWinners = topWinners;
+      _remainingFreeDraws = freeDrawStatus['remaining'] ?? 3;
+      _maxFreeDraws = freeDrawStatus['max'] ?? 3;
       _isInitializing = false;
     });
 
-    // 외부 포인트 잔액 조회
     _loadExternalBalance();
   }
 
   Future<void> _loadExternalBalance() async {
     if (_currentUser == null) return;
-
     setState(() => _isLoadingExternal = true);
-
     try {
-      final balance = await _dbService.getExternalPointBalance(_currentUser!.id);
+      final balance =
+          await _dbService.getExternalPointBalance(_currentUser!.id);
       setState(() {
         _externalBalance = balance;
         _isLoadingExternal = false;
@@ -110,7 +116,6 @@ class _LotteryPageState extends State<LotteryPage> {
 
       setState(() => _isLoading = false);
 
-      // 당첨 결과의 인덱스 찾기
       int winningIndex = 0;
       for (int i = 0; i < prizeStructure.length; i++) {
         if (prizeStructure[i].range == draw.prizeRange) {
@@ -119,7 +124,6 @@ class _LotteryPageState extends State<LotteryPage> {
         }
       }
 
-      // 룰렛 다이얼로그 표시
       if (mounted) {
         showDialog(
           context: context,
@@ -129,16 +133,14 @@ class _LotteryPageState extends State<LotteryPage> {
             child: Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
+                color: AppColors.bgCard,
+                borderRadius: BorderRadius.circular(24),
               ),
               child: RouletteWidget(
                 winningIndex: winningIndex,
                 onSpinComplete: () {
                   Navigator.pop(context);
-                  // 결과 다이얼로그 표시
                   _showDrawResult(draw);
-                  // 데이터 새로고침
                   _loadData();
                 },
               ),
@@ -152,15 +154,163 @@ class _LotteryPageState extends State<LotteryPage> {
     }
   }
 
-  void _showDrawResult(Draw draw) {
+  Future<void> _startFreeDrawWithAd() async {
+    if (_currentUser == null) return;
+
+    if (_remainingFreeDraws <= 0) {
+      _showError('오늘 무료 추첨 횟수를 모두 사용했습니다. 내일 다시 도전하세요!');
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.bgCard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Text('📺', style: TextStyle(fontSize: 24)),
+            SizedBox(width: 8),
+            Text('무료 도전',
+                style: TextStyle(
+                    color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.accentSurface,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  const Icon(Icons.videocam, color: AppColors.accent, size: 36),
+                  const SizedBox(height: 8),
+                  const Text(
+                    '15초 광고를 시청하면\n포인트 없이 무료로 도전할 수 있어요!',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        fontSize: 14, color: AppColors.textPrimary, height: 1.5),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.local_activity,
+                    size: 16, color: AppColors.secondary),
+                const SizedBox(width: 6),
+                Text(
+                  '오늘 남은 무료 도전: $_remainingFreeDraws/$_maxFreeDraws회',
+                  style: const TextStyle(
+                      fontSize: 13,
+                      color: AppColors.secondary,
+                      fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('취소',
+                style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.pop(context, true),
+            icon: const Icon(Icons.play_arrow, size: 18),
+            label: const Text('광고 보기'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.accent,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AdRewardDialog(
+        onComplete: () => _conductFreeDraw(),
+      ),
+    );
+  }
+
+  Future<void> _conductFreeDraw() async {
+    if (_currentUser == null) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final result = await _dbService.conductFreeDraw(_currentUser!.id);
+      final draw = Draw.fromJson(result['draw']);
+
+      setState(() => _isLoading = false);
+
+      int winningIndex = 0;
+      for (int i = 0; i < prizeStructure.length; i++) {
+        if (prizeStructure[i].range == draw.prizeRange) {
+          winningIndex = i;
+          break;
+        }
+      }
+
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => Dialog(
+            backgroundColor: Colors.transparent,
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppColors.bgCard,
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: RouletteWidget(
+                winningIndex: winningIndex,
+                onSpinComplete: () {
+                  Navigator.pop(context);
+                  _showFreeDrawResult(draw, result['freeDrawsUsed'] as int,
+                      result['maxFreeDraws'] as int);
+                  _loadData();
+                },
+              ),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      _showError('$e');
+    }
+  }
+
+  void _showFreeDrawResult(Draw draw, int freeDrawsUsed, int maxFreeDraws) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: AppColors.bgCard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Row(
           children: [
-            Icon(Icons.celebration, color: Colors.amber, size: 28),
+            Icon(Icons.celebration, color: AppColors.accent, size: 28),
             SizedBox(width: 8),
-            Text('🎉 행운의 결과'),
+            Text('무료 도전 결과!',
+                style: TextStyle(
+                    color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
           ],
         ),
         content: Column(
@@ -170,8 +320,8 @@ class _LotteryPageState extends State<LotteryPage> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.purple[50]!, Colors.purple[100]!],
+                gradient: const LinearGradient(
+                  colors: [AppColors.accentSurface, Color(0xFFE0EAFF)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -182,19 +332,181 @@ class _LotteryPageState extends State<LotteryPage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        '도전 포인트',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey,
+                      const Text('도전 방식',
+                          style: TextStyle(
+                              fontSize: 14, color: AppColors.textSecondary)),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.accent,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text('무료 (광고 시청)',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('획득 포인트',
+                          style: TextStyle(
+                              fontSize: 14, color: AppColors.textSecondary)),
+                      Text(
+                        '${NumberFormat('#,###').format(draw.winAmount)}P',
+                        style: const TextStyle(
+                          color: AppColors.accent,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 24,
                         ),
                       ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.local_activity,
+                    size: 14, color: AppColors.textSecondary),
+                const SizedBox(width: 6),
+                Text(
+                  '오늘 무료 도전: $freeDrawsUsed/$maxFreeDraws회 사용',
+                  style: const TextStyle(
+                      fontSize: 12, color: AppColors.textSecondary),
+                ),
+              ],
+            ),
+            if (draw.externalName != null) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [AppColors.secondarySurface, Color(0xFFD5F5E9)],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.secondary, width: 2),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.card_giftcard,
+                        color: AppColors.secondary, size: 32),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            '특별 경품 당첨!',
+                            style: TextStyle(
+                                color: AppColors.secondaryDark,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${draw.externalName}',
+                            style: const TextStyle(
+                                color: AppColors.secondaryDark, fontSize: 14),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            '쿠폰함에서 코드를 확인하세요',
+                            style: TextStyle(
+                                color: AppColors.textSecondary, fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.share_outlined,
+                color: AppColors.textSecondary),
+            tooltip: '결과 공유',
+            onPressed: () => _shareDrawResult(draw, isFree: true),
+          ),
+          if (draw.externalName != null)
+            TextButton.icon(
+              onPressed: () {
+                Navigator.pop(context);
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => CouponBoxPage(userId: _currentUser!.id),
+                  ),
+                ).then((_) => _loadData());
+              },
+              icon: const Icon(Icons.card_giftcard, color: AppColors.secondary),
+              label: const Text('쿠폰함 보기',
+                  style: TextStyle(color: AppColors.secondary)),
+            ),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('확인',
+                style: TextStyle(
+                    color: AppColors.accent, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDrawResult(Draw draw) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.bgCard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.celebration, color: AppColors.primary, size: 28),
+            SizedBox(width: 8),
+            Text('행운의 결과',
+                style: TextStyle(
+                    color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [AppColors.primarySurface, Color(0xFFFFF8E1)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('도전 포인트',
+                          style: TextStyle(
+                              fontSize: 14, color: AppColors.textSecondary)),
                       Text(
                         '${_numberFormat.format(draw.betAmount)}P',
                         style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                        ),
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.textPrimary),
                       ),
                     ],
                   ),
@@ -202,17 +514,13 @@ class _LotteryPageState extends State<LotteryPage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        '획득 포인트',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey,
-                        ),
-                      ),
+                      const Text('획득 포인트',
+                          style: TextStyle(
+                              fontSize: 14, color: AppColors.textSecondary)),
                       Text(
                         '${_numberFormat.format(draw.winAmount)}P',
-                        style: TextStyle(
-                          color: Colors.purple[700],
+                        style: const TextStyle(
+                          color: AppColors.primary,
                           fontWeight: FontWeight.bold,
                           fontSize: 24,
                         ),
@@ -227,43 +535,39 @@ class _LotteryPageState extends State<LotteryPage> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Colors.amber[50]!, Colors.orange[50]!],
+                  gradient: const LinearGradient(
+                    colors: [AppColors.secondarySurface, Color(0xFFD5F5E9)],
                   ),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.amber[700]!, width: 2),
+                  border: Border.all(color: AppColors.secondary, width: 2),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.card_giftcard, color: Colors.orange[700], size: 32),
+                    const Icon(Icons.card_giftcard,
+                        color: AppColors.secondary, size: 32),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
+                          const Text(
                             '특별 경품 당첨!',
                             style: TextStyle(
-                              color: Colors.orange[900],
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
+                                color: AppColors.secondaryDark,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             '${draw.externalName}',
-                            style: TextStyle(
-                              color: Colors.orange[800],
-                              fontSize: 14,
-                            ),
+                            style: const TextStyle(
+                                color: AppColors.secondaryDark, fontSize: 14),
                           ),
                           const SizedBox(height: 4),
-                          Text(
+                          const Text(
                             '쿠폰함에서 코드를 확인하세요',
                             style: TextStyle(
-                              color: Colors.grey[600],
-                              fontSize: 12,
-                            ),
+                                color: AppColors.textSecondary, fontSize: 12),
                           ),
                         ],
                       ),
@@ -275,6 +579,11 @@ class _LotteryPageState extends State<LotteryPage> {
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.share_outlined, color: AppColors.textSecondary),
+            tooltip: '결과 공유',
+            onPressed: () => _shareDrawResult(draw, isFree: false),
+          ),
           if (draw.externalName != null)
             TextButton.icon(
               onPressed: () {
@@ -285,32 +594,54 @@ class _LotteryPageState extends State<LotteryPage> {
                   ),
                 ).then((_) => _loadData());
               },
-              icon: const Icon(Icons.card_giftcard),
-              label: const Text('쿠폰함 보기'),
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.amber[700],
-              ),
+              icon: const Icon(Icons.card_giftcard, color: AppColors.secondary),
+              label: const Text('쿠폰함 보기',
+                  style: TextStyle(color: AppColors.secondary)),
             ),
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('확인'),
+            child: const Text('확인',
+                style: TextStyle(
+                    color: AppColors.primary, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
     );
   }
 
+  void _shareDrawResult(Draw draw, {required bool isFree}) {
+    final prizeEmoji = draw.winAmount == 0
+        ? '😅'
+        : draw.winAmount >= 100
+            ? '🎉'
+            : '🍀';
+    final freeTag = isFree ? '(광고 무료 도전)' : '';
+    final externalLine = draw.externalName != null
+        ? '\n🎁 특별 경품: ${draw.externalName}'
+        : '';
+
+    Share.share(
+      '$prizeEmoji 오늘의 행운 #${draw.round}회 $freeTag\n'
+      '${draw.prizeRange} 당첨! ${_numberFormat.format(draw.winAmount)}P 획득!\n'
+      '$externalLine\n'
+      '나도 오늘의 행운에 도전해보세요 🍀 #오늘의행운 #LuckyToday',
+    );
+  }
+
   void _showChargeDialog() {
     final amountController = TextEditingController();
-    
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: AppColors.bgCard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Row(
           children: [
-            Icon(Icons.add_circle, color: Colors.green),
+            Icon(Icons.add_circle, color: AppColors.secondary),
             SizedBox(width: 8),
-            Text('포인트 충전'),
+            Text('포인트 충전',
+                style: TextStyle(color: AppColors.textPrimary)),
           ],
         ),
         content: Column(
@@ -319,11 +650,10 @@ class _LotteryPageState extends State<LotteryPage> {
           children: [
             Text(
               '외부 포인트: ${_externalBalance != null ? _numberFormat.format(_externalBalance!) : '---'}P',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.blue[700],
-              ),
+              style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.accent),
             ),
             const SizedBox(height: 16),
             TextField(
@@ -334,22 +664,26 @@ class _LotteryPageState extends State<LotteryPage> {
                 labelText: '충전할 금액',
                 suffixText: 'P',
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(12)),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide:
+                      const BorderSide(color: AppColors.secondary, width: 2),
                 ),
                 helperText: '외부 포인트 → 게임 포인트로 전환',
               ),
             ),
             const SizedBox(height: 8),
-            Text(
-              '1:1 비율로 전환됩니다',
-              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-            ),
+            const Text('1:1 비율로 전환됩니다',
+                style:
+                    TextStyle(fontSize: 12, color: AppColors.textSecondary)),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('취소'),
+            child: const Text('취소',
+                style: TextStyle(color: AppColors.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -360,13 +694,14 @@ class _LotteryPageState extends State<LotteryPage> {
                 );
                 return;
               }
-
               Navigator.pop(context);
               await _chargePoints(amount);
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
+              backgroundColor: AppColors.secondary,
               foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
             ),
             child: const Text('충전하기'),
           ),
@@ -378,7 +713,6 @@ class _LotteryPageState extends State<LotteryPage> {
   Future<void> _chargePoints(int amount) async {
     if (_currentUser == null) return;
 
-    // 로딩 다이얼로그 표시
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -386,7 +720,7 @@ class _LotteryPageState extends State<LotteryPage> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CircularProgressIndicator(),
+            CircularProgressIndicator(color: AppColors.secondary),
             SizedBox(height: 16),
             Text('외부 포인트사와 통신 중...'),
           ],
@@ -396,32 +730,28 @@ class _LotteryPageState extends State<LotteryPage> {
 
     try {
       await _dbService.chargePoints(_currentUser!.id, amount);
-      
       if (mounted) {
-        Navigator.pop(context); // 로딩 다이얼로그 닫기
-
-        // 데이터 새로고침
+        Navigator.pop(context);
         await _loadData();
-
-        // 성공 다이얼로그
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20)),
             title: const Row(
               children: [
-                Icon(Icons.check_circle, color: Colors.green),
+                Icon(Icons.check_circle, color: AppColors.secondary),
                 SizedBox(width: 8),
                 Text('충전 완료'),
               ],
             ),
-            content: Text(
-              '${_numberFormat.format(amount)}P가 충전되었습니다!',
-              style: const TextStyle(fontSize: 16),
-            ),
+            content: Text('${_numberFormat.format(amount)}P가 충전되었습니다!',
+                style: const TextStyle(fontSize: 16)),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('확인'),
+                child: const Text('확인',
+                    style: TextStyle(color: AppColors.primary)),
               ),
             ],
           ),
@@ -429,7 +759,7 @@ class _LotteryPageState extends State<LotteryPage> {
       }
     } catch (e) {
       if (mounted) {
-        Navigator.pop(context); // 로딩 다이얼로그 닫기
+        Navigator.pop(context);
         _showError('충전 실패: $e');
       }
     }
@@ -437,15 +767,18 @@ class _LotteryPageState extends State<LotteryPage> {
 
   void _showWithdrawDialog() {
     final amountController = TextEditingController();
-    
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: AppColors.bgCard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Row(
           children: [
-            Icon(Icons.remove_circle, color: Colors.orange),
+            Icon(Icons.remove_circle, color: AppColors.primary),
             SizedBox(width: 8),
-            Text('포인트 환전'),
+            Text('포인트 환전',
+                style: TextStyle(color: AppColors.textPrimary)),
           ],
         ),
         content: Column(
@@ -454,11 +787,10 @@ class _LotteryPageState extends State<LotteryPage> {
           children: [
             Text(
               '현재 포인트: ${_numberFormat.format(_currentUser?.points ?? 0)}P',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.purple[700],
-              ),
+              style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primary),
             ),
             const SizedBox(height: 16),
             TextField(
@@ -469,22 +801,26 @@ class _LotteryPageState extends State<LotteryPage> {
                 labelText: '환전할 금액',
                 suffixText: 'P',
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(12)),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide:
+                      const BorderSide(color: AppColors.primary, width: 2),
                 ),
                 helperText: '게임 포인트 → 외부 포인트로 전환',
               ),
             ),
             const SizedBox(height: 8),
-            Text(
-              '1:1 비율로 전환됩니다',
-              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-            ),
+            const Text('1:1 비율로 전환됩니다',
+                style:
+                    TextStyle(fontSize: 12, color: AppColors.textSecondary)),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('취소'),
+            child: const Text('취소',
+                style: TextStyle(color: AppColors.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -495,20 +831,20 @@ class _LotteryPageState extends State<LotteryPage> {
                 );
                 return;
               }
-
               if (amount > (_currentUser?.points ?? 0)) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('포인트가 부족합니다')),
                 );
                 return;
               }
-
               Navigator.pop(context);
               await _withdrawPoints(amount);
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange,
+              backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
             ),
             child: const Text('환전하기'),
           ),
@@ -520,7 +856,6 @@ class _LotteryPageState extends State<LotteryPage> {
   Future<void> _withdrawPoints(int amount) async {
     if (_currentUser == null) return;
 
-    // 로딩 다이얼로그 표시
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -528,7 +863,7 @@ class _LotteryPageState extends State<LotteryPage> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CircularProgressIndicator(),
+            CircularProgressIndicator(color: AppColors.primary),
             SizedBox(height: 16),
             Text('외부 포인트사와 통신 중...'),
           ],
@@ -538,20 +873,17 @@ class _LotteryPageState extends State<LotteryPage> {
 
     try {
       await _dbService.withdrawPoints(_currentUser!.id, amount);
-      
       if (mounted) {
-        Navigator.pop(context); // 로딩 다이얼로그 닫기
-
-        // 데이터 새로고침
+        Navigator.pop(context);
         await _loadData();
-
-        // 성공 다이얼로그
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20)),
             title: const Row(
               children: [
-                Icon(Icons.check_circle, color: Colors.green),
+                Icon(Icons.check_circle, color: AppColors.secondary),
                 SizedBox(width: 8),
                 Text('환전 완료'),
               ],
@@ -563,7 +895,8 @@ class _LotteryPageState extends State<LotteryPage> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('확인'),
+                child: const Text('확인',
+                    style: TextStyle(color: AppColors.primary)),
               ),
             ],
           ),
@@ -571,7 +904,7 @@ class _LotteryPageState extends State<LotteryPage> {
       }
     } catch (e) {
       if (mounted) {
-        Navigator.pop(context); // 로딩 다이얼로그 닫기
+        Navigator.pop(context);
         _showError('환전 실패: $e');
       }
     }
@@ -579,7 +912,8 @@ class _LotteryPageState extends State<LotteryPage> {
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+      SnackBar(
+          content: Text(message), backgroundColor: AppColors.error),
     );
   }
 
@@ -596,36 +930,55 @@ class _LotteryPageState extends State<LotteryPage> {
   Widget build(BuildContext context) {
     if (_isInitializing) {
       return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+        backgroundColor: AppColors.bgPage,
+        body: Center(
+            child: CircularProgressIndicator(color: AppColors.primary)),
       );
     }
 
     if (_currentUser == null) {
       return const Scaffold(
+        backgroundColor: AppColors.bgPage,
         body: Center(child: Text('사용자 정보를 불러올 수 없습니다')),
       );
     }
 
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: AppColors.bgPage,
       appBar: AppBar(
-        title: const Text('오늘의 행운'),
-        backgroundColor: Colors.purple,
+        title: const Text(
+          '오늘의 행운',
+          style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+              fontSize: 18),
+        ),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: AppColors.appBarGradient,
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+          ),
+        ),
+        backgroundColor: Colors.transparent,
         foregroundColor: Colors.white,
+        elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.card_giftcard),
+            icon: const Icon(Icons.card_giftcard_outlined),
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) => CouponBoxPage(userId: _currentUser!.id),
                 ),
-              ).then((_) => _loadData()); // 쿠폰함에서 돌아올 때 데이터 새로고침
+              ).then((_) => _loadData());
             },
             tooltip: '쿠폰함',
           ),
           IconButton(
-            icon: const Icon(Icons.bar_chart),
+            icon: const Icon(Icons.bar_chart_outlined),
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
@@ -636,7 +989,7 @@ class _LotteryPageState extends State<LotteryPage> {
             tooltip: '내 통계',
           ),
           IconButton(
-            icon: const Icon(Icons.history),
+            icon: const Icon(Icons.history_outlined),
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
@@ -655,201 +1008,203 @@ class _LotteryPageState extends State<LotteryPage> {
       ),
       body: SafeArea(
         child: RefreshIndicator(
+          color: AppColors.primary,
           onRefresh: _loadData,
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                // 외부 포인트 잔액 카드
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.blue[600]!, Colors.cyan[500]!],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  padding: const EdgeInsets.all(20),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Text(
-                                '외부 포인트',
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.9),
-                                  fontSize: 14,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              if (_isLoadingExternal)
-                                const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation(Colors.white),
+                // 포인트 현황 (2열 그리드)
+                Row(
+                  children: [
+                    // 게임 포인트
+                    Expanded(
+                      flex: 3,
+                      child: Container(
+                        padding: const EdgeInsets.all(18),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [AppColors.primary, AppColors.primaryLight],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primary.withOpacity(0.3),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.account_balance_wallet,
+                                    color: Colors.white, size: 18),
+                                const SizedBox(width: 6),
+                                Text(
+                                  '게임 포인트',
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.9),
+                                    fontSize: 13,
                                   ),
                                 ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _externalBalance != null
-                                ? '${_numberFormat.format(_externalBalance!)}P'
-                                : '---P',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
+                              ],
                             ),
-                          ),
-                        ],
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.refresh, color: Colors.white),
-                        onPressed: _loadExternalBalance,
-                        tooltip: '새로고침',
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // 게임 포인트 카드
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.purple[500]!, Colors.pink[500]!],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  padding: const EdgeInsets.all(24),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '게임 포인트',
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.9),
-                              fontSize: 14,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '${_numberFormat.format(_currentUser!.points)}P',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 32,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                      Icon(
-                        Icons.account_balance_wallet,
-                        size: 48,
-                        color: Colors.white.withValues(alpha: 0.8),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // 일일 추첨 횟수 카드
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.blue[400]!, Colors.cyan[400]!],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  padding: const EdgeInsets.all(20),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '오늘의 남은 횟수',
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.9),
-                              fontSize: 14,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              Text(
-                                '$_remainingDraws',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 32,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '${_numberFormat.format(_currentUser!.points)}P',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 26,
+                                fontWeight: FontWeight.bold,
                               ),
-                              Text(
-                                ' / $_maxDailyDraws 회',
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.7),
-                                  fontSize: 16,
-                                ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // 외부 포인트 + 남은 횟수
+                    Expanded(
+                      flex: 2,
+                      child: Column(
+                        children: [
+                          // 외부 포인트
+                          Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [AppColors.accent, Color(0xFF3D84F7)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
                               ),
-                            ],
+                              borderRadius: BorderRadius.circular(14),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.accent.withOpacity(0.3),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Icon(Icons.swap_horiz,
+                                        color: Colors.white, size: 14),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '외부 포인트',
+                                      style: TextStyle(
+                                          color: Colors.white.withOpacity(0.9),
+                                          fontSize: 11),
+                                    ),
+                                    if (_isLoadingExternal) ...[
+                                      const SizedBox(width: 4),
+                                      const SizedBox(
+                                        width: 12,
+                                        height: 12,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 1.5,
+                                          valueColor:
+                                              AlwaysStoppedAnimation(Colors.white),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  _externalBalance != null
+                                      ? '${_numberFormat.format(_externalBalance!)}P'
+                                      : '---P',
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _remainingDraws > 0 
-                                ? '매일 자정에 초기화됩니다'
-                                : '내일 다시 도전하세요!',
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.8),
-                              fontSize: 12,
+                          const SizedBox(height: 8),
+                          // 남은 횟수
+                          Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: _remainingDraws > 0
+                                  ? AppColors.secondarySurface
+                                  : const Color(0xFFF5F5F5),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: _remainingDraws > 0
+                                    ? AppColors.secondary
+                                    : AppColors.textHint,
+                                width: 1.5,
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '남은 횟수',
+                                  style: TextStyle(
+                                      color: AppColors.textSecondary,
+                                      fontSize: 11),
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  children: [
+                                    Text(
+                                      '$_remainingDraws',
+                                      style: TextStyle(
+                                        color: _remainingDraws > 0
+                                            ? AppColors.secondary
+                                            : AppColors.textSecondary,
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    Text(
+                                      '/$_maxDailyDraws',
+                                      style: TextStyle(
+                                          color: AppColors.textHint,
+                                          fontSize: 13),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
-                      Icon(
-                        _remainingDraws > 0 
-                            ? Icons.check_circle 
-                            : Icons.block,
-                        size: 48,
-                        color: Colors.white.withValues(alpha: 0.8),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 12),
 
-                // 충전/환전 버튼
+                // 충전 / 환전 버튼
                 Row(
                   children: [
                     Expanded(
                       child: ElevatedButton.icon(
                         onPressed: _showChargeDialog,
-                        icon: const Icon(Icons.add_circle),
+                        icon: const Icon(Icons.add_circle_outline, size: 18),
                         label: const Text('포인트 충전'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
+                          backgroundColor: AppColors.secondary,
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
+                          elevation: 0,
                         ),
                       ),
                     ),
@@ -857,15 +1212,17 @@ class _LotteryPageState extends State<LotteryPage> {
                     Expanded(
                       child: ElevatedButton.icon(
                         onPressed: _showWithdrawDialog,
-                        icon: const Icon(Icons.remove_circle),
+                        icon:
+                            const Icon(Icons.remove_circle_outline, size: 18),
                         label: const Text('포인트 환전'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.orange,
+                          backgroundColor: AppColors.primary,
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
+                          elevation: 0,
                         ),
                       ),
                     ),
@@ -873,136 +1230,101 @@ class _LotteryPageState extends State<LotteryPage> {
                 ),
                 const SizedBox(height: 16),
 
-                // 배팅 카드
+                // 행운 도전 카드
                 Card(
-                  elevation: 2,
+                  elevation: 0,
+                  color: AppColors.bgCard,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(20),
+                    side: const BorderSide(
+                        color: Color(0xFFEEEEEE), width: 1),
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.all(20),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.card_giftcard, color: Colors.purple[600]),
-                            const SizedBox(width: 8),
-                            const Text(
-                              '행운 도전하기',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: AppColors.primarySurface,
+                                borderRadius: BorderRadius.circular(10),
                               ),
+                              child: const Text('🍀',
+                                  style: TextStyle(fontSize: 20)),
+                            ),
+                            const SizedBox(width: 12),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  '행운 도전하기',
+                                  style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.textPrimary),
+                                ),
+                                Text(
+                                  _remainingDraws > 0
+                                      ? '오늘 $_remainingDraws번 더 도전할 수 있어요!'
+                                      : '내일 자정에 다시 도전하세요',
+                                  style: const TextStyle(
+                                      color: AppColors.textSecondary,
+                                      fontSize: 13),
+                                ),
+                              ],
                             ),
                           ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '지금 바로 당신의 행운을 확인하세요! 🍀',
-                          style: TextStyle(color: Colors.grey[600]),
                         ),
                         const SizedBox(height: 16),
                         Row(
                           children: [
                             Expanded(
-                              child: ElevatedButton(
-                                onPressed: (_isLoading || _remainingDraws <= 0)
-                                    ? null
-                                    : () => _conductDraw(_betPoint1),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.blue[500],
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 32),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                child: Column(
-                                  children: [
-                                    Text(
-                                      '${_betPoint1}P',
-                                      style: const TextStyle(
-                                        fontSize: 28,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    Text(
-                                      _isLoading 
-                                          ? '처리중...' 
-                                          : _remainingDraws <= 0 
-                                              ? '횟수초과' 
-                                              : '도전하기',
-                                      style: const TextStyle(fontSize: 12),
-                                    ),
-                                  ],
-                                ),
-                              ),
+                              child: _buildBetButton(_betPoint1,
+                                  AppColors.primary, AppColors.primarySurface),
                             ),
-                            const SizedBox(width: 16),
+                            const SizedBox(width: 12),
                             Expanded(
-                              child: ElevatedButton(
-                                onPressed: (_isLoading || _remainingDraws <= 0)
-                                    ? null
-                                    : () => _conductDraw(_betPoint2),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.purple[500],
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 32),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                child: Column(
-                                  children: [
-                                    Text(
-                                      '${_betPoint2}P',
-                                      style: const TextStyle(
-                                        fontSize: 28,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    Text(
-                                      _isLoading 
-                                          ? '처리중...' 
-                                          : _remainingDraws <= 0 
-                                              ? '횟수초과' 
-                                              : '도전하기',
-                                      style: const TextStyle(fontSize: 12),
-                                    ),
-                                  ],
-                                ),
-                              ),
+                              child: _buildBetButton(_betPoint2,
+                                  AppColors.secondary, AppColors.secondarySurface),
                             ),
                           ],
                         ),
+                        const SizedBox(height: 12),
+                        _buildFreeDrawButton(),
                       ],
                     ),
                   ),
                 ),
                 const SizedBox(height: 16),
 
-                // 당일 높은 경품 당첨자 목록
+                // 오늘의 행운의 주인공
                 Card(
-                  elevation: 2,
+                  elevation: 0,
+                  color: AppColors.bgCard,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(20),
+                    side: const BorderSide(
+                        color: Color(0xFFEEEEEE), width: 1),
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.all(20),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.emoji_events, color: Colors.amber[700]),
+                            const Icon(Icons.emoji_events,
+                                color: AppColors.primary),
                             const SizedBox(width: 8),
                             const Text(
                               '오늘의 행운의 주인공들',
                               style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textPrimary),
                             ),
                           ],
                         ),
@@ -1010,10 +1332,11 @@ class _LotteryPageState extends State<LotteryPage> {
                         if (_todayTopWinners.isEmpty)
                           const Center(
                             child: Padding(
-                              padding: EdgeInsets.all(32),
+                              padding: EdgeInsets.all(24),
                               child: Text(
                                 '아직 첫 행운의 주인공을 기다리고 있어요!',
-                                style: TextStyle(color: Colors.grey),
+                                style: TextStyle(
+                                    color: AppColors.textSecondary),
                               ),
                             ),
                           )
@@ -1022,126 +1345,98 @@ class _LotteryPageState extends State<LotteryPage> {
                             final index = entry.key;
                             final winner = entry.value;
                             final isTopThree = index < 3;
-                            
-                            Color rankColor;
-                            IconData rankIcon;
-                            if (index == 0) {
-                              rankColor = Colors.amber[700]!;
-                              rankIcon = Icons.looks_one;
-                            } else if (index == 1) {
-                              rankColor = Colors.grey[600]!;
-                              rankIcon = Icons.looks_two;
-                            } else if (index == 2) {
-                              rankColor = Colors.orange[700]!;
-                              rankIcon = Icons.looks_3;
-                            } else {
-                              rankColor = Colors.blue[700]!;
-                              rankIcon = Icons.star_border;
-                            }
-                            
+
+                            final rankColors = [
+                              const Color(0xFFF5A623),
+                              const Color(0xFF9EA5AE),
+                              const Color(0xFFCD7F32),
+                            ];
+                            final rankColor = isTopThree
+                                ? rankColors[index]
+                                : AppColors.textHint;
+
                             return Container(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              padding: const EdgeInsets.all(12),
+                              margin: const EdgeInsets.only(bottom: 10),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 10),
                               decoration: BoxDecoration(
-                                color: isTopThree 
-                                    ? rankColor.withOpacity(0.1)
-                                    : Colors.grey[50],
+                                color: isTopThree
+                                    ? rankColor.withOpacity(0.07)
+                                    : AppColors.bgSecondary,
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
-                                  color: isTopThree 
-                                      ? rankColor.withOpacity(0.3)
-                                      : Colors.grey[300]!,
-                                  width: isTopThree ? 2 : 1,
+                                  color: isTopThree
+                                      ? rankColor.withOpacity(0.25)
+                                      : const Color(0xFFEEEEEE),
                                 ),
                               ),
                               child: Row(
                                 children: [
-                                  // 순위 아이콘
                                   Container(
-                                    width: 36,
-                                    height: 36,
+                                    width: 32,
+                                    height: 32,
                                     decoration: BoxDecoration(
-                                      color: rankColor.withOpacity(0.2),
+                                      color: rankColor.withOpacity(0.15),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
-                                    child: Icon(
-                                      rankIcon,
-                                      color: rankColor,
-                                      size: 24,
+                                    child: Center(
+                                      child: Text(
+                                        isTopThree
+                                            ? ['🥇', '🥈', '🥉'][index]
+                                            : '${index + 1}',
+                                        style: TextStyle(
+                                            fontSize:
+                                                isTopThree ? 16 : 12,
+                                            fontWeight: FontWeight.bold,
+                                            color: rankColor),
+                                      ),
                                     ),
                                   ),
-                                  const SizedBox(width: 12),
-                                  // 당첨자 정보
+                                  const SizedBox(width: 10),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
-                                        Row(
-                                          children: [
-                                            Text(
-                                              winner['name'] as String,
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 15,
-                                                color: isTopThree 
-                                                    ? rankColor 
-                                                    : Colors.black87,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(
-                                                horizontal: 6,
-                                                vertical: 2,
-                                              ),
-                                              decoration: BoxDecoration(
-                                                color: Colors.purple[100],
-                                                borderRadius: BorderRadius.circular(4),
-                                              ),
-                                              child: Text(
-                                                winner['prizeRange'] as String,
-                                                style: TextStyle(
-                                                  fontSize: 10,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: Colors.purple[700],
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 4),
                                         Text(
-                                          '획득: ${_numberFormat.format(winner['winAmount'])}P (${winner['multiplier']}배)',
+                                          winner['name'] as String,
                                           style: TextStyle(
-                                            fontSize: 13,
-                                            color: Colors.grey[700],
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                            color: isTopThree
+                                                ? rankColor
+                                                : AppColors.textPrimary,
                                           ),
+                                        ),
+                                        Text(
+                                          winner['prizeRange'] as String,
+                                          style: const TextStyle(
+                                              fontSize: 12,
+                                              color: AppColors.textSecondary),
                                         ),
                                       ],
                                     ),
                                   ),
-                                  // 당첨 금액 강조
                                   Column(
-                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.end,
                                     children: [
                                       Text(
                                         '${_numberFormat.format(winner['winAmount'])}P',
                                         style: TextStyle(
-                                          fontSize: 16,
+                                          fontSize: 15,
                                           fontWeight: FontWeight.bold,
-                                          color: isTopThree 
-                                              ? rankColor 
-                                              : Colors.purple[700],
+                                          color: isTopThree
+                                              ? rankColor
+                                              : AppColors.textPrimary,
                                         ),
                                       ),
                                       Text(
                                         DateFormat('HH:mm').format(
-                                          winner['createdAt'] as DateTime,
-                                        ),
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: Colors.grey[500],
-                                        ),
+                                            winner['createdAt'] as DateTime),
+                                        style: const TextStyle(
+                                            fontSize: 11,
+                                            color: AppColors.textHint),
                                       ),
                                     ],
                                   ),
@@ -1155,14 +1450,17 @@ class _LotteryPageState extends State<LotteryPage> {
                 ),
                 const SizedBox(height: 16),
 
-                // 추첨 기록 (간략 버전)
+                // 최근 당첨 내역
                 Card(
-                  elevation: 2,
+                  elevation: 0,
+                  color: AppColors.bgCard,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(20),
+                    side: const BorderSide(
+                        color: Color(0xFFEEEEEE), width: 1),
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.all(20),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -1172,85 +1470,137 @@ class _LotteryPageState extends State<LotteryPage> {
                             const Text(
                               '최근 당첨 내역',
                               style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textPrimary),
                             ),
                             if (_drawHistory.isNotEmpty)
                               TextButton(
                                 onPressed: () {
-                                  // 전체 이력 보기 (간단히 구현)
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => UserStatsPage(
+                                          userId: _currentUser!.id),
+                                    ),
+                                  );
                                 },
+                                style: TextButton.styleFrom(
+                                  foregroundColor: AppColors.primary,
+                                  padding: EdgeInsets.zero,
+                                ),
                                 child: const Text('전체보기'),
                               ),
                           ],
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 12),
                         if (_drawHistory.isEmpty)
                           const Center(
                             child: Padding(
-                              padding: EdgeInsets.all(32),
+                              padding: EdgeInsets.all(24),
                               child: Text(
                                 '아직 당첨 내역이 없습니다',
-                                style: TextStyle(color: Colors.grey),
+                                style: TextStyle(
+                                    color: AppColors.textSecondary),
                               ),
                             ),
                           )
                         else
-                          ..._drawHistory.take(5).map((draw) => Card(
-                                margin: const EdgeInsets.only(bottom: 12),
-                                color: Colors.grey[50],
-                                child: Padding(
-                                  padding: const EdgeInsets.all(16),
-                                  child: Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
+                          ..._drawHistory.take(5).map((draw) {
+                            final isFree = draw.betAmount == 0;
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: isFree
+                                    ? AppColors.accentSurface
+                                    : AppColors.bgSecondary,
+                                borderRadius: BorderRadius.circular(12),
+                                border: isFree
+                                    ? Border.all(
+                                        color: AppColors.accent.withOpacity(0.4),
+                                        width: 1)
+                                    : null,
+                              ),
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            '#${draw.round}',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.grey[600],
-                                            ),
-                                          ),
-                                          Text(
-                                            '${draw.betAmount}P 도전',
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                          ),
-                                        ],
+                                      Text(
+                                        '#${draw.round}',
+                                        style: const TextStyle(
+                                            fontSize: 11,
+                                            color: AppColors.textHint),
                                       ),
-                                      Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.end,
+                                      Row(
                                         children: [
-                                          Text(
-                                            '당첨 ${_numberFormat.format(draw.winAmount)}P',
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 16,
-                                              color: Colors.purple[700],
-                                            ),
-                                          ),
-                                          if (draw.externalName != null)
-                                            Text(
-                                              '🎁 ${draw.externalName}',
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                color: Colors.orange[700],
+                                          if (isFree) ...[
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 6,
+                                                      vertical: 1),
+                                              decoration: BoxDecoration(
+                                                color: AppColors.accent,
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
+                                              ),
+                                              child: const Text(
+                                                '무료',
+                                                style: TextStyle(
+                                                    fontSize: 10,
+                                                    color: Colors.white,
+                                                    fontWeight:
+                                                        FontWeight.bold),
                                               ),
                                             ),
+                                            const SizedBox(width: 6),
+                                          ],
+                                          Text(
+                                            isFree
+                                                ? '광고 시청 도전'
+                                                : '${draw.betAmount}P 도전',
+                                            style: TextStyle(
+                                                fontWeight: FontWeight.w500,
+                                                color: isFree
+                                                    ? AppColors.accent
+                                                    : AppColors.textPrimary),
+                                          ),
                                         ],
                                       ),
                                     ],
                                   ),
-                                ),
-                              )),
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.end,
+                                    children: [
+                                      Text(
+                                        '당첨 ${_numberFormat.format(draw.winAmount)}P',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 15,
+                                          color: isFree
+                                              ? AppColors.accent
+                                              : AppColors.primary,
+                                        ),
+                                      ),
+                                      if (draw.externalName != null)
+                                        Text(
+                                          '🎁 ${draw.externalName}',
+                                          style: const TextStyle(
+                                              fontSize: 11,
+                                              color: AppColors.secondary),
+                                        ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            );
+                          }),
                       ],
                     ),
                   ),
@@ -1258,6 +1608,91 @@ class _LotteryPageState extends State<LotteryPage> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFreeDrawButton() {
+    final bool noFreeDraws = _remainingFreeDraws <= 0;
+    final bool disabled = _isLoading || noFreeDraws;
+
+    return GestureDetector(
+      onTap: disabled ? null : _startFreeDrawWithAd,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: disabled ? const Color(0xFFF0F0F0) : AppColors.accentSurface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: disabled ? AppColors.textHint : AppColors.accent,
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              noFreeDraws ? Icons.videocam_off : Icons.videocam,
+              color: disabled ? AppColors.textHint : AppColors.accent,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              noFreeDraws
+                  ? '오늘 무료 도전 횟수를 모두 사용했습니다'
+                  : '광고 보고 무료 도전  ($_remainingFreeDraws/$_maxFreeDraws)',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: disabled ? AppColors.textHint : AppColors.accent,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBetButton(int betAmount, Color color, Color surfaceColor) {
+    final bool disabled = _isLoading || _remainingDraws <= 0;
+    return GestureDetector(
+      onTap: disabled ? null : () => _conductDraw(betAmount),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        decoration: BoxDecoration(
+          color: disabled ? const Color(0xFFF0F0F0) : surfaceColor,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: disabled ? AppColors.textHint : color,
+            width: 2,
+          ),
+        ),
+        child: Column(
+          children: [
+            Text(
+              '${betAmount}P',
+              style: TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.bold,
+                color: disabled ? AppColors.textHint : color,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              _isLoading
+                  ? '처리중...'
+                  : _remainingDraws <= 0
+                      ? '횟수 초과'
+                      : '도전하기',
+              style: TextStyle(
+                  fontSize: 12,
+                  color: disabled ? AppColors.textHint : AppColors.textSecondary),
+            ),
+          ],
         ),
       ),
     );

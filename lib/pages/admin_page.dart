@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../services/database_service.dart';
 import '../models/external_prize.dart';
 import '../models/draw.dart';
+import '../config/app_colors.dart';
 import 'login_page.dart';
 import 'admin_customers_page.dart';
 import 'external_prize_management_page.dart';
@@ -124,24 +125,39 @@ class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMix
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.bgPage,
       appBar: AppBar(
-        title: const Text('관리자 대시보드'),
-        backgroundColor: Colors.purple,
+        title: const Text(
+          '관리자 대시보드',
+          style: TextStyle(
+              fontWeight: FontWeight.bold, color: Colors.white, fontSize: 18),
+        ),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: AppColors.appBarGradient,
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+          ),
+        ),
+        backgroundColor: Colors.transparent,
         foregroundColor: Colors.white,
+        elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.settings),
+            icon: const Icon(Icons.settings_outlined),
             tooltip: '시스템 설정',
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) => const SystemSettingsPage(),
                 ),
-              ).then((_) => _loadData()); // 돌아올 때 데이터 새로고침
+              ).then((_) => _loadData());
             },
           ),
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.restore),
             tooltip: 'DB 초기화',
             onPressed: _resetDatabase,
           ),
@@ -154,6 +170,7 @@ class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMix
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: Colors.white,
+          indicatorWeight: 3,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white70,
           tabs: const [
@@ -165,7 +182,8 @@ class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMix
         ),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(
+              child: CircularProgressIndicator(color: AppColors.primary))
           : TabBarView(
               controller: _tabController,
               children: [
@@ -186,9 +204,12 @@ class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMix
     final totalRevenue = _stats!['totalRevenue'] as int;
     final totalPayout = _stats!['totalPayout'] as int;
     final totalParticipants = _stats!['totalParticipants'] as int;
+    final totalFreeDraws = _stats!['totalFreeDraws'] as int? ?? 0;
+    final paidDraws = _draws.where((d) => d.betAmount > 0).length;
     final profit = totalRevenue - (totalPayout - totalRevenue);
 
     return RefreshIndicator(
+      color: AppColors.primary,
       onRefresh: _loadData,
       child: ListView(
         padding: const EdgeInsets.all(16),
@@ -197,26 +218,27 @@ class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMix
             '총 수익',
             '${_numberFormat.format(totalRevenue)}P',
             Icons.trending_up,
-            Colors.green,
+            AppColors.secondary,
           ),
           _buildStatCard(
             '총 지급액',
             '${_numberFormat.format(totalPayout)}P',
             Icons.payment,
-            Colors.blue,
+            AppColors.accent,
           ),
           _buildStatCard(
             '순이익',
             '${_numberFormat.format(profit)}P',
             Icons.account_balance,
-            Colors.purple,
+            AppColors.primary,
           ),
           _buildStatCard(
             '참여자 수',
             '$totalParticipants명',
             Icons.people,
-            Colors.orange,
+            AppColors.prize100p,
           ),
+          _buildFreeDrawStatCard(totalFreeDraws, paidDraws),
         ],
       ),
     );
@@ -291,8 +313,8 @@ class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMix
               child: Container(
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Colors.purple[500]!, Colors.pink[500]!],
+                  gradient: const LinearGradient(
+                    colors: [AppColors.primary, AppColors.primaryLight],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -351,7 +373,7 @@ class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMix
           // 현재 등록된 경품 목록
           Row(
             children: [
-              const Icon(Icons.list, color: Colors.purple),
+              const Icon(Icons.list, color: AppColors.primary),
               const SizedBox(width: 8),
               Text(
                 '등록된 외부 경품 (${_prizes.length}개)',
@@ -413,13 +435,13 @@ class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMix
                 child: ListTile(
                   leading: CircleAvatar(
                     backgroundColor: isOutOfStock
-                        ? Colors.grey[300]
-                        : Colors.purple[100],
+                        ? const Color(0xFFF0F0F0)
+                        : AppColors.primarySurface,
                     child: Icon(
                       Icons.card_giftcard,
                       color: isOutOfStock
-                          ? Colors.grey[600]
-                          : Colors.purple[700],
+                          ? AppColors.textHint
+                          : AppColors.primaryDark,
                     ),
                   ),
                   title: Text(
@@ -520,12 +542,36 @@ class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMix
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        '#${draw.round}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
+                      Row(
+                        children: [
+                          Text(
+                            '#${draw.round}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                          if (draw.betAmount == 0) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.accentSurface,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                    color: AppColors.accent, width: 1),
+                              ),
+                              child: const Text(
+                                '무료',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.accent,
+                                    fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                       Text(
                         DateFormat('yyyy-MM-dd HH:mm').format(draw.createdAt),
@@ -540,7 +586,11 @@ class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMix
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      _buildDrawStat('배팅', '${draw.betAmount}P'),
+                      _buildDrawStat(
+                        '배팅',
+                        draw.betAmount == 0 ? '무료' : '${draw.betAmount}P',
+                        color: draw.betAmount == 0 ? AppColors.accent : null,
+                      ),
                       _buildDrawStat('당첨', '${draw.winAmount}P'),
                       _buildDrawStat(
                         '손익',
@@ -572,6 +622,120 @@ class _AdminPageState extends State<AdminPage> with SingleTickerProviderStateMix
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildFreeDrawStatCard(int totalFreeDraws, int paidDraws) {
+    final totalDraws = totalFreeDraws + paidDraws;
+    final freeRatio = totalDraws > 0 ? totalFreeDraws / totalDraws : 0.0;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.accentSurface,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.videocam,
+                      color: AppColors.accent, size: 32),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '광고 무료 도전',
+                        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                      ),
+                      const SizedBox(height: 4),
+                      RichText(
+                        text: TextSpan(
+                          children: [
+                            TextSpan(
+                              text: '$totalFreeDraws',
+                              style: const TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.accent),
+                            ),
+                            TextSpan(
+                              text: '  /  전체 $totalDraws회',
+                              style: TextStyle(
+                                  fontSize: 14, color: Colors.grey[500]),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: LinearProgressIndicator(
+                value: freeRatio,
+                minHeight: 8,
+                backgroundColor: const Color(0xFFEEEEEE),
+                valueColor:
+                    const AlwaysStoppedAnimation<Color>(AppColors.accent),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: const BoxDecoration(
+                          color: AppColors.accent, shape: BoxShape.circle),
+                    ),
+                    const SizedBox(width: 6),
+                    Text('무료 도전  $totalFreeDraws회',
+                        style:
+                            TextStyle(fontSize: 12, color: Colors.grey[600])),
+                  ],
+                ),
+                Row(
+                  children: [
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                          color: Colors.grey[300], shape: BoxShape.circle),
+                    ),
+                    const SizedBox(width: 6),
+                    Text('유료 도전  $paidDraws회',
+                        style:
+                            TextStyle(fontSize: 12, color: Colors.grey[600])),
+                  ],
+                ),
+                Text(
+                  '무료 비율 ${(freeRatio * 100).toStringAsFixed(1)}%',
+                  style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.accent),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

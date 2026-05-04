@@ -32,6 +32,10 @@ class DatabaseService {
   static int _betPoint2 = 10;
   static int _maxDailyDraws = 5;
 
+  // 광고 시청 무료 추첨 (하루 최대 3회, paid 횟수와 별도)
+  static const int _maxDailyFreeDraws = 3;
+  static final Map<String, int> _freeDrawCounts = {}; // key: userId_YYYY-MM-DD
+
   final PrizeService _prizeService = PrizeService();
   final ExternalPointApiService _externalApi = ExternalPointApiService();
 
@@ -161,12 +165,22 @@ class DatabaseService {
       
       // 현재 사용자 ID 로드
       _currentUserId = prefs.getString('currentUserId');
-      
+
       // 시스템 설정 로드
       _betPoint1 = prefs.getInt('betPoint1') ?? 5;
       _betPoint2 = prefs.getInt('betPoint2') ?? 10;
       _maxDailyDraws = prefs.getInt('maxDailyDraws') ?? 5;
-      
+
+      // 무료 추첨 횟수 로드
+      final freeDrawJson = prefs.getString('freeDrawCounts');
+      if (freeDrawJson != null) {
+        final decoded = jsonDecode(freeDrawJson) as Map<String, dynamic>;
+        _freeDrawCounts.clear();
+        decoded.forEach((key, value) {
+          _freeDrawCounts[key] = value as int;
+        });
+      }
+
       print('✅ SharedPreferences 데이터 로드 완료');
     } catch (e) {
       print('❌ SharedPreferences 로드 실패: $e');
@@ -202,7 +216,10 @@ class DatabaseService {
       await prefs.setInt('betPoint1', _betPoint1);
       await prefs.setInt('betPoint2', _betPoint2);
       await prefs.setInt('maxDailyDraws', _maxDailyDraws);
-      
+
+      // 무료 추첨 횟수 저장
+      await prefs.setString('freeDrawCounts', jsonEncode(_freeDrawCounts));
+
       print('✅ SharedPreferences 데이터 저장 완료');
     } catch (e) {
       print('❌ SharedPreferences 저장 실패: $e');
@@ -674,18 +691,21 @@ class DatabaseService {
 
     int totalRevenue = 0;
     int totalPayout = 0;
+    int totalFreeDraws = 0;
     final Set<String> participants = {};
 
     for (final draw in draws) {
       totalRevenue += draw.feeAmount;
       totalPayout += draw.winAmount;
       participants.add(draw.userId);
+      if (draw.betAmount == 0) totalFreeDraws++;
     }
 
     return {
       'totalRevenue': totalRevenue,
       'totalPayout': totalPayout,
       'totalParticipants': participants.length,
+      'totalFreeDraws': totalFreeDraws,
     };
   }
 
@@ -1015,9 +1035,117 @@ class DatabaseService {
   /// 현재 배팅 포인트 가져오기
   int getBetPoint1() => _betPoint1;
   int getBetPoint2() => _betPoint2;
-  
+
   /// 현재 일일 최대 배팅 횟수 가져오기
   int getMaxDailyDraws() => _maxDailyDraws;
+
+  // ── 광고 시청 무료 추첨 ────────────────────────────────────────
+
+  String _todayKey() {
+    final now = DateTime.now();
+    return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+  }
+
+  /// 오늘 남은 무료 추첨 횟수 조회
+  Future<Map<String, int>> getUserDailyFreeDrawStatus(String userId) async {
+    final key = '${userId}_${_todayKey()}';
+    final used = _freeDrawCounts[key] ?? 0;
+    return {
+      'remaining': _maxDailyFreeDraws - used,
+      'used': used,
+      'max': _maxDailyFreeDraws,
+    };
+  }
+
+  /// 광고 시청 후 무료 배팅 실행 (포인트 차감 없음)
+  Future<Map<String, dynamic>> conductFreeDraw(String userId) async {
+    // 사용자 찾기
+    User? user;
+    String? userEmail;
+    for (final entry in _users.entries) {
+      final u = User.fromJson(entry.value);
+      if (u.id == userId) {
+        user = u;
+        userEmail = entry.key;
+        break;
+      }
+    }
+    if (user == null) throw Exception('사용자를 찾을 수 없습니다');
+
+    // 일일 무료 횟수 확인
+    final freeKey = '${userId}_${_todayKey()}';
+    final usedFree = _freeDrawCounts[freeKey] ?? 0;
+    if (usedFree >= _maxDailyFreeDraws) {
+      throw Exception('오늘 무료 추첨 횟수($_maxDailyFreeDraws회)를 모두 사용했습니다. 내일 다시 도전하세요!');
+    }
+
+    // 가상 베팅금 = betPoint1 (prize 계산에만 사용, 실제 차감 없음)
+    final virtualBet = _betPoint1;
+    final selected = _prizeService.pickPrize();
+    final winAmount = (virtualBet * selected.multiplier).round();
+
+    // 외부 경품 추첨
+    String? externalName;
+    int? externalValue;
+    if (_prizeService.randomFloat01() < externalPrizeProb) {
+      final availablePrizes = _prizes.values
+          .map((p) => ExternalPrize.fromJson(p))
+          .where((p) => p.stock > 0)
+          .toList();
+
+      if (availablePrizes.isNotEmpty) {
+        final pickedPrize = availablePrizes[
+            (_prizeService.randomFloat01() * availablePrizes.length).floor()];
+        pickedPrize.stock--;
+        _prizes[pickedPrize.id] = pickedPrize.toJson();
+        externalName = pickedPrize.name;
+        externalValue = pickedPrize.value;
+
+        await createCoupon(
+          userId: userId,
+          prizeId: pickedPrize.id,
+          prizeName: pickedPrize.name,
+          prizeValue: pickedPrize.value,
+        );
+        print('🎁 무료 추첨 외부 경품: ${pickedPrize.name}');
+      }
+    }
+
+    // 포인트 지급 (차감 없이 winAmount만 추가)
+    user.points += winAmount;
+    user.drawSeq++;
+    _users[userEmail!] = user.toJson();
+
+    // 무료 횟수 증가
+    _freeDrawCounts[freeKey] = usedFree + 1;
+
+    // 추첨 기록 (betAmount=0)
+    final draw = Draw(
+      id: _prizeService.generateId(),
+      userId: userId,
+      round: user.drawSeq,
+      betAmount: 0,
+      feeAmount: 0,
+      winAmount: winAmount,
+      multiplier: selected.multiplier,
+      prizeRange: selected.range,
+      externalName: externalName,
+      externalValue: externalValue,
+      userNet: winAmount,
+    );
+
+    _draws[draw.id] = draw.toJson();
+    await _saveToStorage();
+
+    print('✅ 무료 추첨 완료: ${user.email} +${winAmount}P (오늘 ${usedFree + 1}/$_maxDailyFreeDraws회)');
+
+    return {
+      'userPoints': user.points,
+      'draw': draw.toJson(),
+      'freeDrawsUsed': usedFree + 1,
+      'maxFreeDraws': _maxDailyFreeDraws,
+    };
+  }
   
   /// 당일 높은 경품 당첨자 목록 (상위 10명)
   Future<List<Map<String, dynamic>>> getTodayTopWinners({int limit = 10}) async {

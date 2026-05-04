@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/database_service.dart';
 import '../config/prize_config.dart';
+import '../config/app_colors.dart';
 
 class SystemSettingsPage extends StatefulWidget {
   const SystemSettingsPage({super.key});
@@ -80,9 +81,9 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.blue[50],
+                  color: AppColors.accentSurface,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.blue[200]!),
+                  border: Border.all(color: AppColors.accent),
                 ),
                 child: const Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -153,7 +154,7 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
               });
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.purple,
+              backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
             ),
             child: const Text('저장'),
@@ -217,9 +218,9 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.orange[50],
+                  color: AppColors.primarySurface,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.orange[200]!),
+                  border: Border.all(color: AppColors.primaryLight),
                 ),
                 child: const Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -315,11 +316,25 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: AppColors.bgPage,
       appBar: AppBar(
-        title: const Text('시스템 설정'),
-        backgroundColor: Colors.purple,
+        title: const Text(
+          '시스템 설정',
+          style: TextStyle(
+              fontWeight: FontWeight.bold, color: Colors.white, fontSize: 18),
+        ),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: AppColors.appBarGradient,
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+          ),
+        ),
+        backgroundColor: Colors.transparent,
         foregroundColor: Colors.white,
+        elevation: 0,
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -356,7 +371,7 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
                                   height: 48,
                                   decoration: BoxDecoration(
                                     gradient: LinearGradient(
-                                      colors: [Colors.blue[400]!, Colors.cyan[400]!],
+                                      colors: [AppColors.accent, AppColors.secondary],
                                       begin: Alignment.topLeft,
                                       end: Alignment.bottomRight,
                                     ),
@@ -403,9 +418,9 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
                                   child: Container(
                                     padding: const EdgeInsets.all(16),
                                     decoration: BoxDecoration(
-                                      color: Colors.blue[50],
+                                      color: AppColors.accentSurface,
                                       borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(color: Colors.blue[200]!),
+                                      border: Border.all(color: AppColors.accent),
                                     ),
                                     child: Column(
                                       children: [
@@ -422,7 +437,7 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
                                           style: TextStyle(
                                             fontSize: 24,
                                             fontWeight: FontWeight.bold,
-                                            color: Colors.blue[700],
+                                            color: AppColors.accent,
                                           ),
                                         ),
                                       ],
@@ -434,9 +449,9 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
                                   child: Container(
                                     padding: const EdgeInsets.all(16),
                                     decoration: BoxDecoration(
-                                      color: Colors.purple[50],
+                                      color: AppColors.primarySurface,
                                       borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(color: Colors.purple[200]!),
+                                      border: Border.all(color: AppColors.primaryLight),
                                     ),
                                     child: Column(
                                       children: [
@@ -453,7 +468,7 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
                                           style: TextStyle(
                                             fontSize: 24,
                                             fontWeight: FontWeight.bold,
-                                            color: Colors.purple[700],
+                                            color: AppColors.primaryDark,
                                           ),
                                         ),
                                       ],
@@ -490,7 +505,7 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
                                   height: 48,
                                   decoration: BoxDecoration(
                                     gradient: LinearGradient(
-                                      colors: [Colors.orange[400]!, Colors.deepOrange[400]!],
+                                      colors: [AppColors.primary, AppColors.primaryDark],
                                       begin: Alignment.topLeft,
                                       end: Alignment.bottomRight,
                                     ),
@@ -534,9 +549,9 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
                             Container(
                               padding: const EdgeInsets.all(20),
                               decoration: BoxDecoration(
-                                color: Colors.orange[50],
+                                color: AppColors.primarySurface,
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.orange[200]!),
+                                border: Border.all(color: AppColors.primaryLight),
                               ),
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
@@ -553,7 +568,7 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
                                     style: TextStyle(
                                       fontSize: 32,
                                       fontWeight: FontWeight.bold,
-                                      color: Colors.orange[700],
+                                      color: AppColors.primaryDark,
                                     ),
                                   ),
                                 ],
@@ -563,7 +578,7 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
                             Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: Colors.blue[50],
+                                color: AppColors.accentSurface,
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: const Row(
@@ -593,27 +608,27 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Colors.purple[50]!, Colors.pink[50]!],
+                      gradient: const LinearGradient(
+                        colors: [AppColors.primarySurface, Color(0xFFFFF0F5)],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.purple[200]!),
+                      border: Border.all(color: AppColors.primaryLight),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.lightbulb_outline, color: Colors.purple[700]),
+                            Icon(Icons.lightbulb_outline, color: AppColors.primaryDark),
                             const SizedBox(width: 8),
                             Text(
                               '설정 안내',
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.purple[700],
+                                color: AppColors.primaryDark,
                               ),
                             ),
                           ],
@@ -626,7 +641,7 @@ class _SystemSettingsPageState extends State<SystemSettingsPage> {
                           '• 일일 배팅 횟수는 최소 1회 이상 설정해야 합니다',
                           style: TextStyle(
                             fontSize: 13,
-                            color: Colors.purple[700],
+                            color: AppColors.primaryDark,
                             height: 1.5,
                           ),
                         ),
