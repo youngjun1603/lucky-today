@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:barcode_widget/barcode_widget.dart';
 import '../services/database_service.dart';
 import '../models/coupon.dart';
 import '../config/app_colors.dart';
@@ -226,7 +227,43 @@ class _CouponBoxPageState extends State<CouponBoxPage> with SingleTickerProvider
               ),
             ),
             const SizedBox(height: 12),
-            
+
+            // 바코드
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isActive ? AppColors.primaryLight : const Color(0xFFDDDDDD),
+                ),
+              ),
+              child: Column(
+                children: [
+                  BarcodeWidget(
+                    barcode: Barcode.code128(),
+                    data: coupon.couponCode,
+                    width: double.infinity,
+                    height: 56,
+                    drawText: false,
+                    color: isActive ? AppColors.textPrimary : Colors.grey,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    coupon.couponCode,
+                    style: TextStyle(
+                      fontSize: 11,
+                      letterSpacing: 2,
+                      fontFamily: 'Courier',
+                      color: isActive ? AppColors.textSecondary : Colors.grey,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+
             // 발급일/사용일
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
