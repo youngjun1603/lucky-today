@@ -1078,7 +1078,6 @@ class _LotteryPageState extends State<LotteryPage> {
                   children: [
                     // 게임 포인트
                     Expanded(
-                      flex: 3,
                       child: Container(
                         padding: const EdgeInsets.all(18),
                         decoration: BoxDecoration(
@@ -1127,120 +1126,65 @@ class _LotteryPageState extends State<LotteryPage> {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    // 외부 포인트 + 남은 횟수
+                    // 외부 포인트
                     Expanded(
-                      flex: 2,
-                      child: Column(
-                        children: [
-                          // 외부 포인트
-                          Container(
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [AppColors.accent, Color(0xFF3D84F7)],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              borderRadius: BorderRadius.circular(14),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppColors.accent.withOpacity(0.3),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    const Icon(Icons.swap_horiz,
-                                        color: Colors.white, size: 14),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      '외부 포인트',
-                                      style: TextStyle(
-                                          color: Colors.white.withOpacity(0.9),
-                                          fontSize: 11),
-                                    ),
-                                    if (_isLoadingExternal) ...[
-                                      const SizedBox(width: 4),
-                                      const SizedBox(
-                                        width: 12,
-                                        height: 12,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 1.5,
-                                          valueColor:
-                                              AlwaysStoppedAnimation(Colors.white),
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  _externalBalance != null
-                                      ? '${_numberFormat.format(_externalBalance!)}P'
-                                      : '---P',
-                                  style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold),
-                                ),
-                              ],
-                            ),
+                      child: Container(
+                        padding: const EdgeInsets.all(18),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [AppColors.accent, Color(0xFF3D84F7)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
                           ),
-                          const SizedBox(height: 8),
-                          // 남은 횟수
-                          Container(
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: _remainingDraws > 0
-                                  ? AppColors.secondarySurface
-                                  : const Color(0xFFF5F5F5),
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: _remainingDraws > 0
-                                    ? AppColors.secondary
-                                    : AppColors.textHint,
-                                width: 1.5,
-                              ),
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.accent.withOpacity(0.3),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
                             ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
                               children: [
+                                const Icon(Icons.swap_horiz,
+                                    color: Colors.white, size: 18),
+                                const SizedBox(width: 6),
                                 Text(
-                                  '남은 횟수',
+                                  '외부 포인트',
                                   style: TextStyle(
-                                      color: AppColors.textSecondary,
-                                      fontSize: 11),
+                                      color: Colors.white.withOpacity(0.9),
+                                      fontSize: 13),
                                 ),
-                                const SizedBox(height: 4),
-                                Row(
-                                  children: [
-                                    Text(
-                                      '$_remainingDraws',
-                                      style: TextStyle(
-                                        color: _remainingDraws > 0
-                                            ? AppColors.secondary
-                                            : AppColors.textSecondary,
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                if (_isLoadingExternal) ...[
+                                  const SizedBox(width: 4),
+                                  const SizedBox(
+                                    width: 12,
+                                    height: 12,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 1.5,
+                                      valueColor:
+                                          AlwaysStoppedAnimation(Colors.white),
                                     ),
-                                    Text(
-                                      '/$_maxDailyDraws',
-                                      style: TextStyle(
-                                          color: AppColors.textHint,
-                                          fontSize: 13),
-                                    ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ],
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 8),
+                            Text(
+                              _externalBalance != null
+                                  ? '${_numberFormat.format(_externalBalance!)}P'
+                                  : '---P',
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],
@@ -1384,6 +1328,30 @@ class _LotteryPageState extends State<LotteryPage> {
                         ),
                         const SizedBox(height: 12),
                         _buildFreeDrawButton(),
+                        const SizedBox(height: 10),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.loop,
+                              size: 13,
+                              color: _remainingDraws > 0
+                                  ? AppColors.secondary
+                                  : AppColors.textHint,
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              '포인트 도전 남은 횟수: $_remainingDraws/$_maxDailyDraws회',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: _remainingDraws > 0
+                                    ? AppColors.secondary
+                                    : AppColors.textHint,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
