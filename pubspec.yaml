@@ -52,6 +52,9 @@ dependencies:
   # 당첨 결과 공유
   share_plus: ^10.1.4
 
+  # 바코드 생성 (추첨 결과 바코드 출력)
+  barcode_widget: ^2.2.5
+
   # 로컬 알림 (일일 무료 도전 리마인더)
   flutter_local_notifications: ^18.0.1
   timezone: ^0.9.4

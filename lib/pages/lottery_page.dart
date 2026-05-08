@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:barcode_widget/barcode_widget.dart';
 import '../services/database_service.dart';
 import '../services/kiosk_service.dart';
 import '../models/user.dart';
@@ -486,6 +487,8 @@ class _LotteryPageState extends State<LotteryPage> {
                 ),
               ),
             ],
+            const SizedBox(height: 16),
+            _buildBarcodeSection(draw),
           ],
         ),
         actions: [
@@ -632,6 +635,8 @@ class _LotteryPageState extends State<LotteryPage> {
                 ),
               ),
             ],
+            const SizedBox(height: 16),
+            _buildBarcodeSection(draw),
           ],
         ),
         actions: [
@@ -964,6 +969,39 @@ class _LotteryPageState extends State<LotteryPage> {
         _showError('환전 실패: $e');
       }
     }
+  }
+
+  Widget _buildBarcodeSection(Draw draw) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE0E0E0)),
+      ),
+      child: Column(
+        children: [
+          BarcodeWidget(
+            barcode: Barcode.code128(),
+            data: draw.id,
+            width: double.infinity,
+            height: 56,
+            drawText: false,
+            color: AppColors.textPrimary,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '#${draw.round.toString().padLeft(6, '0')}',
+            style: const TextStyle(
+              fontSize: 11,
+              color: AppColors.textSecondary,
+              letterSpacing: 3,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showError(String message) {
