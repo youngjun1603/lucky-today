@@ -1,8 +1,8 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../config/prize_config.dart';
 import '../config/app_colors.dart';
+import '../services/sound_service.dart';
 
 class RouletteWidget extends StatefulWidget {
   final int winningIndex;
@@ -52,8 +52,7 @@ class _RouletteWidgetState extends State<RouletteWidget>
     if (now.difference(_lastSoundTime).inMilliseconds < 80) return;
     _lastSoundTime = now;
 
-    SystemSound.play(SystemSoundType.click);
-    HapticFeedback.selectionClick();
+    SoundService().playTick();
   }
 
   void _startSpin() {
@@ -72,7 +71,7 @@ class _RouletteWidgetState extends State<RouletteWidget>
     _animation.addListener(_onSpinTick);
 
     _controller.forward().then((_) {
-      HapticFeedback.heavyImpact();
+      SoundService().playWin();
       Future.delayed(const Duration(milliseconds: 500), () {
         if (mounted) widget.onSpinComplete();
       });

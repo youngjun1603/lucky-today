@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:barcode_widget/barcode_widget.dart';
+import '../services/sound_service.dart';
 import '../services/database_service.dart';
 import '../services/kiosk_service.dart';
 import '../models/user.dart';
@@ -156,6 +157,7 @@ class _LotteryPageState extends State<LotteryPage> {
   }
 
   Future<void> _conductDraw(int betAmount) async {
+    SoundService().init(); // 사용자 제스처 컨텍스트에서 Web Audio 활성화
     if (_currentUser == null) return;
 
     if (_currentUser!.points < betAmount) {
@@ -305,6 +307,7 @@ class _LotteryPageState extends State<LotteryPage> {
   }
 
   Future<void> _conductFreeDraw() async {
+    SoundService().init(); // 사용자 제스처 컨텍스트에서 Web Audio 활성화
     if (_currentUser == null) return;
 
     setState(() => _isLoading = true);
