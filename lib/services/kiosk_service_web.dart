@@ -106,6 +106,42 @@ class KioskService {
     });
   }
 
+  /// 할인 적용 — 획득 포인트를 즉시 금액 할인으로 결제에 적용
+  void sendRedeemDiscount({
+    required String drawId,
+    required int round,
+    required int discountAmount,
+  }) {
+    _post({
+      'type': 'WEB_REDEEM_DISCOUNT',
+      'data': {
+        'drawId': drawId,
+        'round': round,
+        'discountAmount': discountAmount,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+      },
+    });
+  }
+
+  /// 바코드 쿠폰 — 쿠폰 바코드 데이터를 키오스크로 전달 (스캔/프린트용)
+  void sendRedeemCoupon({
+    required String drawId,
+    required int round,
+    required int winAmount,
+    required String barcodeData,
+  }) {
+    _post({
+      'type': 'WEB_REDEEM_COUPON',
+      'data': {
+        'drawId': drawId,
+        'round': round,
+        'winAmount': winAmount,
+        'barcodeData': barcodeData,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+      },
+    });
+  }
+
   void sendError({required String code, required String message}) =>
       _post({'type': 'WEB_ERROR', 'data': {'code': code, 'message': message}});
 

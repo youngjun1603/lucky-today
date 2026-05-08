@@ -34,6 +34,19 @@ class KioskService {
     int? externalPoints,
   }) {}
 
+  void sendRedeemDiscount({
+    required String drawId,
+    required int round,
+    required int discountAmount,
+  }) {}
+
+  void sendRedeemCoupon({
+    required String drawId,
+    required int round,
+    required int winAmount,
+    required String barcodeData,
+  }) {}
+
   void sendError({required String code, required String message}) {}
   void sendSessionExpired() {}
 }

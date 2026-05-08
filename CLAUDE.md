@@ -76,6 +76,8 @@
 | `WEB_BALANCE_UPDATE` | `{ gamePoints, remainingFreeDraws, remainingPaidDraws }` | 잔액/횟수 동기화 |
 | `WEB_ERROR` | `{ code, message }` | 오류 발생 |
 | `WEB_SESSION_EXPIRED` | `{}` | 세션 만료 |
+| `WEB_REDEEM_DISCOUNT` | `{ drawId, round, discountAmount }` | 고객이 "할인 적용" 선택 → 결제 금액에서 차감 |
+| `WEB_REDEEM_COUPON` | `{ drawId, round, winAmount, barcodeData }` | 고객이 "바코드 쿠폰" 선택 → 키오스크 스캔/프린트용 |
 
 ### 광고 흐름
 키오스크에서 광고 재생 → 완료 후 `KIOSK_START_FREE_DRAW` 전송 → Flutter가 15초 다이얼로그 없이 룰렛 즉시 실행

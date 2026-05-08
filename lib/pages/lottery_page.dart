@@ -491,34 +491,79 @@ class _LotteryPageState extends State<LotteryPage> {
             _buildBarcodeSection(draw),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.share_outlined,
-                color: AppColors.textSecondary),
-            tooltip: '결과 공유',
-            onPressed: () => _shareDrawResult(draw, isFree: true),
-          ),
-          if (draw.externalName != null)
-            TextButton.icon(
-              onPressed: () {
-                Navigator.pop(context);
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => CouponBoxPage(userId: _currentUser!.id),
+        actions: _kioskService.isKioskMode
+            ? [
+                if (draw.winAmount > 0)
+                  TextButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      _kioskService.sendRedeemDiscount(
+                        drawId: draw.id,
+                        round: draw.round,
+                        discountAmount: draw.winAmount,
+                      );
+                    },
+                    icon: const Icon(Icons.discount_outlined,
+                        color: AppColors.secondary),
+                    label: Text(
+                      '할인 적용 (${_numberFormat.format(draw.winAmount)}P)',
+                      style: const TextStyle(color: AppColors.secondary),
+                    ),
                   ),
-                ).then((_) => _loadData());
-              },
-              icon: const Icon(Icons.card_giftcard, color: AppColors.secondary),
-              label: const Text('쿠폰함 보기',
-                  style: TextStyle(color: AppColors.secondary)),
-            ),
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('확인',
-                style: TextStyle(
-                    color: AppColors.accent, fontWeight: FontWeight.bold)),
-          ),
-        ],
+                ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    _kioskService.sendRedeemCoupon(
+                      drawId: draw.id,
+                      round: draw.round,
+                      winAmount: draw.winAmount,
+                      barcodeData: draw.id,
+                    );
+                    Future.microtask(() {
+                      if (mounted) _showKioskCouponDialog(draw);
+                    });
+                  },
+                  icon: const Icon(Icons.qr_code_2),
+                  label: const Text('바코드 쿠폰'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.accent,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ]
+            : [
+                IconButton(
+                  icon: const Icon(Icons.share_outlined,
+                      color: AppColors.textSecondary),
+                  tooltip: '결과 공유',
+                  onPressed: () => _shareDrawResult(draw, isFree: true),
+                ),
+                if (draw.externalName != null)
+                  TextButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              CouponBoxPage(userId: _currentUser!.id),
+                        ),
+                      ).then((_) => _loadData());
+                    },
+                    icon: const Icon(Icons.card_giftcard,
+                        color: AppColors.secondary),
+                    label: const Text('쿠폰함 보기',
+                        style: TextStyle(color: AppColors.secondary)),
+                  ),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('확인',
+                      style: TextStyle(
+                          color: AppColors.accent,
+                          fontWeight: FontWeight.bold)),
+                ),
+              ],
       ),
     );
   }
@@ -639,33 +684,79 @@ class _LotteryPageState extends State<LotteryPage> {
             _buildBarcodeSection(draw),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.share_outlined, color: AppColors.textSecondary),
-            tooltip: '결과 공유',
-            onPressed: () => _shareDrawResult(draw, isFree: false),
-          ),
-          if (draw.externalName != null)
-            TextButton.icon(
-              onPressed: () {
-                Navigator.pop(context);
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => CouponBoxPage(userId: _currentUser!.id),
+        actions: _kioskService.isKioskMode
+            ? [
+                if (draw.winAmount > 0)
+                  TextButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      _kioskService.sendRedeemDiscount(
+                        drawId: draw.id,
+                        round: draw.round,
+                        discountAmount: draw.winAmount,
+                      );
+                    },
+                    icon: const Icon(Icons.discount_outlined,
+                        color: AppColors.secondary),
+                    label: Text(
+                      '할인 적용 (${_numberFormat.format(draw.winAmount)}P)',
+                      style: const TextStyle(color: AppColors.secondary),
+                    ),
                   ),
-                ).then((_) => _loadData());
-              },
-              icon: const Icon(Icons.card_giftcard, color: AppColors.secondary),
-              label: const Text('쿠폰함 보기',
-                  style: TextStyle(color: AppColors.secondary)),
-            ),
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('확인',
-                style: TextStyle(
-                    color: AppColors.primary, fontWeight: FontWeight.bold)),
-          ),
-        ],
+                ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    _kioskService.sendRedeemCoupon(
+                      drawId: draw.id,
+                      round: draw.round,
+                      winAmount: draw.winAmount,
+                      barcodeData: draw.id,
+                    );
+                    Future.microtask(() {
+                      if (mounted) _showKioskCouponDialog(draw);
+                    });
+                  },
+                  icon: const Icon(Icons.qr_code_2),
+                  label: const Text('바코드 쿠폰'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.accent,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ]
+            : [
+                IconButton(
+                  icon: const Icon(Icons.share_outlined,
+                      color: AppColors.textSecondary),
+                  tooltip: '결과 공유',
+                  onPressed: () => _shareDrawResult(draw, isFree: false),
+                ),
+                if (draw.externalName != null)
+                  TextButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              CouponBoxPage(userId: _currentUser!.id),
+                        ),
+                      ).then((_) => _loadData());
+                    },
+                    icon: const Icon(Icons.card_giftcard,
+                        color: AppColors.secondary),
+                    label: const Text('쿠폰함 보기',
+                        style: TextStyle(color: AppColors.secondary)),
+                  ),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('확인',
+                      style: TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.bold)),
+                ),
+              ],
       ),
     );
   }
@@ -969,6 +1060,81 @@ class _LotteryPageState extends State<LotteryPage> {
         _showError('환전 실패: $e');
       }
     }
+  }
+
+  void _showKioskCouponDialog(Draw draw) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.qr_code_2, color: AppColors.accent, size: 26),
+            SizedBox(width: 8),
+            Text('바코드 쿠폰',
+                style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              '스캐너로 바코드를 인식해 주세요',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE0E0E0)),
+              ),
+              child: Column(
+                children: [
+                  BarcodeWidget(
+                    barcode: Barcode.code128(),
+                    data: draw.id,
+                    width: double.infinity,
+                    height: 80,
+                    drawText: false,
+                    color: Colors.black,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '#${draw.round.toString().padLeft(6, '0')}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                      letterSpacing: 3,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${_numberFormat.format(draw.winAmount)}P 쿠폰',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.accent,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('닫기',
+                style: TextStyle(color: AppColors.textSecondary)),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildBarcodeSection(Draw draw) {
