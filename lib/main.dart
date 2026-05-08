@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'services/database_service.dart';
 import 'services/notification_service.dart';
+import 'services/kiosk_service.dart';
 import 'models/user.dart';
 import 'pages/login_page.dart';
 import 'pages/lottery_page.dart';
@@ -15,12 +16,28 @@ void main() async {
   final dbService = DatabaseService();
   User? currentUser;
 
+  // 키오스크 서비스 초기화 (웹에서 postMessage 브리지 활성화)
+  final kioskService = KioskService();
+  kioskService.initialize();
+
   try {
     await dbService.init();
     print('✅ 데이터베이스 초기화 성공');
     currentUser = await dbService.getCurrentUser();
+
+    // 키오스크 URL 파라미터로 자동 로그인 (?kiosk=1&uid=user@demo.com)
+    if (currentUser == null) {
+      final params = kioskService.getUrlParameters();
+      if (params['kiosk'] == '1' && params['uid'] != null) {
+        currentUser = await dbService.kioskLogin(params['uid']!);
+        print(currentUser != null
+            ? '✅ 키오스크 자동 로그인: ${currentUser!.email}'
+            : '⚠️ 키오스크 자동 로그인 실패: uid=${params['uid']}');
+      }
+    }
+
     print(currentUser != null
-        ? '✅ 로그인 상태 복원: ${currentUser.email}'
+        ? '✅ 로그인 상태 복원: ${currentUser!.email}'
         : 'ℹ️ 로그인 상태 없음 → 로그인 페이지');
   } catch (e) {
     print('❌ 데이터베이스 초기화 실패: $e');

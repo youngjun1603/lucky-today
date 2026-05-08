@@ -19,33 +19,6 @@
 - Accent: `#5B9CF6` (블루)
 - Background: `#FFFDF7`
 
-## 주요 파일 구조
-```
-lib/
-├── main.dart                          # 앱 진입점, 온보딩/로그인/자동로그인 라우팅
-├── config/
-│   ├── app_colors.dart                # 브랜드 컬러 상수
-│   └── prize_config.dart              # 경품 확률 설정
-├── pages/
-│   ├── onboarding_page.dart           # 첫 실행 4슬라이드 온보딩
-│   ├── login_page.dart                # 로그인/회원가입
-│   ├── lottery_page.dart              # 사용자 메인 (룰렛, 무료도전, 공유)
-│   ├── admin_page.dart                # 관리자 대시보드
-│   ├── user_stats_page.dart           # 사용자 통계
-│   ├── coupon_box_page.dart           # 쿠폰함
-│   ├── point_history_page.dart        # 포인트 내역
-│   └── system_settings_page.dart      # 시스템 설정
-├── services/
-│   ├── database_service.dart          # 싱글톤 DB (SharedPreferences)
-│   ├── notification_service.dart      # 조건부 export (웹/모바일 분기)
-│   ├── notification_service_mobile.dart  # Android 알림 구현
-│   ├── notification_service_stub.dart    # 웹용 빈 구현체
-│   └── prize_service.dart             # 경품 추첨 로직
-└── widgets/
-    ├── roulette_widget.dart           # 룰렛 애니메이션 위젯
-    └── ad_reward_dialog.dart          # 광고 보상 다이얼로그 (현재 시뮬레이션)
-```
-
 ## 테스트 계정
 | 역할 | 이메일 | 비밀번호 |
 |---|---|---|
@@ -68,34 +41,44 @@ lib/
 - `database_service.logout()`: `_currentUserId = null` + `_saveToStorage()` 호출
 - `_saveToStorage()`에서 `_currentUserId == null`이면 반드시 `prefs.remove('currentUserId')` 실행
 
-### 알림
-- 매일 오전 9시 무료 도전 리마인더
-- 웹에서는 stub으로 무시 (`dart.library.io` 조건부 import)
-
-## CI/CD (GitHub Actions)
-| 워크플로우 | 트리거 | 결과 |
-|---|---|---|
-| `build.yml` | main push / v* 태그 | Android APK 빌드, Artifacts 저장 |
-| `web.yml` | main push | Flutter Web 빌드 → GitHub Pages 배포 |
-
-### 릴리스 APK 배포
-```bash
-git tag v1.0.1
-git push origin v1.0.1
-# → GitHub Releases에 APK 자동 첨부
-```
-
 ## Android 설정 특이사항
 - `android/app/build.gradle.kts`: `isCoreLibraryDesugaringEnabled = true` 필수
   (flutter_local_notifications가 Java 8+ API 사용)
 - `desugar_jdk_libs:2.1.4` 의존성 추가됨
 
-## 웹 배포 특이사항
-- `--base-href /lucky-today/` 필수
-- OG 이미지: CI에서 Python PIL로 `build/web/images/og-image.png` 생성
-- 카카오톡 캐시 초기화: https://developers.kakao.com/tool/clear/og
+## 키오스크 연동
 
-## 향후 개발 예정
-- [ ] Google AdMob 보상형 광고 실제 연결
-- [ ] Firebase 백엔드 연동
-- [ ] Google Play Store 등록
+### 아키텍처
+키오스크 앱이 Flutter 웹을 **iframe**에 임베드하고 **postMessage**로 양방향 통신.
+
+### URL 파라미터 (iframe src)
+```
+/lucky-today/?kiosk=1&uid=user@demo.com
+```
+- `kiosk=1`: 키오스크 모드 활성화 (AppBar 메뉴 숨김, 충전/환전 버튼 숨김, 안내 배너 표시)
+- `uid`: 사용자 이메일 — `database_service.kioskLogin()`으로 비밀번호 없이 자동 로그인
+
+### 메시지 프로토콜 (JSON 문자열)
+
+**키오스크 → 웹 (iframe.contentWindow.postMessage)**
+| type | data | 설명 |
+|------|------|------|
+| `KIOSK_INIT` | `{ kioskId }` | 세션 갱신 요청 |
+| `KIOSK_START_FREE_DRAW` | `{}` | 광고 시청 완료 → 무료 추첨 즉시 실행 |
+| `KIOSK_START_BET` | `{ betAmount: 5 }` | 포인트 배팅 실행 |
+| `KIOSK_HEARTBEAT` | `{ timestamp }` | 연결 상태 확인 |
+
+**웹 → 키오스크 (window.parent.postMessage)**
+| type | data | 설명 |
+|------|------|------|
+| `WEB_READY` | `{ version }` | Flutter 앱 로드 완료 |
+| `WEB_DRAW_COMPLETE` | `{ drawType, betAmount, winAmount, newGamePoints, prizeLabel, couponWon }` | 룰렛 결과 |
+| `WEB_BALANCE_UPDATE` | `{ gamePoints, remainingFreeDraws, remainingPaidDraws }` | 잔액/횟수 동기화 |
+| `WEB_ERROR` | `{ code, message }` | 오류 발생 |
+| `WEB_SESSION_EXPIRED` | `{}` | 세션 만료 |
+
+### 광고 흐름
+키오스크에서 광고 재생 → 완료 후 `KIOSK_START_FREE_DRAW` 전송 → Flutter가 15초 다이얼로그 없이 룰렛 즉시 실행
+
+### 테스트
+`web/kiosk_demo.html`을 브라우저에서 열면 Flutter 앱을 iframe에 삽입하고 모든 메시지를 시각적으로 테스트 가능.

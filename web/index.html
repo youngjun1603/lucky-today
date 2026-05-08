@@ -50,6 +50,32 @@
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
+  <!--
+    키오스크 연동: postMessage 프로토콜
+    ─────────────────────────────────────────────────────────────────
+    URL 파라미터:
+      ?kiosk=1           키오스크 모드 활성화
+      &uid=USER_EMAIL    자동 로그인할 사용자 ID (이메일)
+      &origin=URL        postMessage 허용 출처 (보안 강화 시 설정)
+
+    키오스크 → 웹 (postMessage):
+      { "type": "KIOSK_INIT",             "data": { "kioskId": "..." } }
+      { "type": "KIOSK_START_FREE_DRAW",  "data": {} }
+      { "type": "KIOSK_START_BET",        "data": { "betAmount": 5 } }
+      { "type": "KIOSK_HEARTBEAT",        "data": { "timestamp": 0 } }
+
+    웹 → 키오스크 (parent.postMessage):
+      { "type": "WEB_READY",          "data": { "version": "1.0.0" } }
+      { "type": "WEB_DRAW_COMPLETE",   "data": { "drawType", "betAmount", "winAmount",
+                                                  "newGamePoints", "prizeLabel", "couponWon" } }
+      { "type": "WEB_BALANCE_UPDATE",  "data": { "gamePoints", "remainingFreeDraws",
+                                                  "remainingPaidDraws" } }
+      { "type": "WEB_ERROR",           "data": { "code", "message" } }
+      { "type": "WEB_SESSION_EXPIRED", "data": {} }
+
+    데모 페이지: kiosk_demo.html
+    ─────────────────────────────────────────────────────────────────
+  -->
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

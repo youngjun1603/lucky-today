@@ -344,6 +344,16 @@ class DatabaseService {
     return null;
   }
 
+  /// 키오스크 신뢰 로그인 — 비밀번호 없이 사용자 ID(이메일)로 직접 세션 설정
+  /// 키오스크 기기는 물리적으로 신뢰된 환경이므로 비밀번호 검증 생략
+  Future<User?> kioskLogin(String userId) async {
+    final userData = _users[userId];
+    if (userData == null) return null;
+    _currentUserId = userId;
+    await _saveToStorage();
+    return User.fromJson(userData);
+  }
+
   /// 회원가입
   Future<User?> register(String email, String password) async {
     print('📝 회원가입 시도: $email');

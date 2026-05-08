@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../services/database_service.dart';
+import '../services/kiosk_service.dart';
 import '../models/user.dart';
 import '../models/draw.dart';
 import '../config/prize_config.dart';
@@ -23,6 +25,7 @@ class LotteryPage extends StatefulWidget {
 
 class _LotteryPageState extends State<LotteryPage> {
   final _dbService = DatabaseService();
+  final _kioskService = KioskService();
   final _numberFormat = NumberFormat('#,###');
 
   User? _currentUser;
@@ -39,10 +42,54 @@ class _LotteryPageState extends State<LotteryPage> {
   bool _isInitializing = true;
   bool _isLoadingExternal = false;
 
+  StreamSubscription<KioskMessage>? _kioskSub;
+
   @override
   void initState() {
     super.initState();
+    _kioskSub = _kioskService.messages.listen(_handleKioskMessage);
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _kioskSub?.cancel();
+    super.dispose();
+  }
+
+  void _handleKioskMessage(KioskMessage msg) {
+    if (!mounted) return;
+    switch (msg.type) {
+      case 'KIOSK_START_FREE_DRAW':
+        // 키오스크에서 광고 시청 완료 신호 → 광고 다이얼로그 없이 바로 무료 추첨
+        if (_remainingFreeDraws > 0 && !_isLoading) _conductFreeDraw();
+        break;
+      case 'KIOSK_START_BET':
+        final bet = (msg.data['betAmount'] as num?)?.toInt() ?? _betPoint1;
+        if (!_isLoading) _conductDraw(bet);
+        break;
+      case 'KIOSK_INIT':
+        // 사용자 세션 갱신 요청
+        _loadData();
+        break;
+    }
+  }
+
+  void _notifyKioskDrawComplete(Draw draw, String drawType) {
+    if (!_kioskService.isKioskMode) return;
+    final current = _currentUser?.points ?? 0;
+    // 스핀 직후이므로 DB 반영 전 추정값 전송, 이후 WEB_BALANCE_UPDATE로 정확값 전달
+    final estimated = drawType == 'free'
+        ? current + draw.winAmount
+        : current + draw.userNet;
+    _kioskService.sendDrawComplete(
+      drawType: drawType,
+      betAmount: draw.betAmount,
+      winAmount: draw.winAmount,
+      newGamePoints: estimated,
+      prizeLabel: draw.prizeRange,
+      couponWon: draw.externalName != null,
+    );
   }
 
   Future<void> _loadData() async {
@@ -76,6 +123,13 @@ class _LotteryPageState extends State<LotteryPage> {
       _maxFreeDraws = freeDrawStatus['max'] ?? 3;
       _isInitializing = false;
     });
+
+    // 키오스크에 최신 잔액/횟수 동기화
+    _kioskService.sendBalanceUpdate(
+      gamePoints: user.points,
+      remainingFreeDraws: (freeDrawStatus['remaining'] as int?) ?? 3,
+      remainingPaidDraws: (drawStatus['remaining'] as int?) ?? 5,
+    );
 
     _loadExternalBalance();
   }
@@ -140,6 +194,7 @@ class _LotteryPageState extends State<LotteryPage> {
                 winningIndex: winningIndex,
                 onSpinComplete: () {
                   Navigator.pop(context);
+                  _notifyKioskDrawComplete(draw, 'bet');
                   _showDrawResult(draw);
                   _loadData();
                 },
@@ -283,6 +338,7 @@ class _LotteryPageState extends State<LotteryPage> {
                 winningIndex: winningIndex,
                 onSpinComplete: () {
                   Navigator.pop(context);
+                  _notifyKioskDrawComplete(draw, 'free');
                   _showFreeDrawResult(draw, result['freeDrawsUsed'] as int,
                       result['maxFreeDraws'] as int);
                   _loadData();
@@ -965,46 +1021,48 @@ class _LotteryPageState extends State<LotteryPage> {
         backgroundColor: Colors.transparent,
         foregroundColor: Colors.white,
         elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.card_giftcard_outlined),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => CouponBoxPage(userId: _currentUser!.id),
+        actions: _kioskService.isKioskMode
+            ? [] // 키오스크 모드: 세션은 키오스크가 관리하므로 네비게이션 숨김
+            : [
+                IconButton(
+                  icon: const Icon(Icons.card_giftcard_outlined),
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => CouponBoxPage(userId: _currentUser!.id),
+                      ),
+                    ).then((_) => _loadData());
+                  },
+                  tooltip: '쿠폰함',
                 ),
-              ).then((_) => _loadData());
-            },
-            tooltip: '쿠폰함',
-          ),
-          IconButton(
-            icon: const Icon(Icons.bar_chart_outlined),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => UserStatsPage(userId: _currentUser!.id),
+                IconButton(
+                  icon: const Icon(Icons.bar_chart_outlined),
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => UserStatsPage(userId: _currentUser!.id),
+                      ),
+                    );
+                  },
+                  tooltip: '내 통계',
                 ),
-              );
-            },
-            tooltip: '내 통계',
-          ),
-          IconButton(
-            icon: const Icon(Icons.history_outlined),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => PointHistoryPage(userId: _currentUser!.id),
+                IconButton(
+                  icon: const Icon(Icons.history_outlined),
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => PointHistoryPage(userId: _currentUser!.id),
+                      ),
+                    );
+                  },
+                  tooltip: '거래 내역',
                 ),
-              );
-            },
-            tooltip: '거래 내역',
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: _logout,
-            tooltip: '로그아웃',
-          ),
-        ],
+                IconButton(
+                  icon: const Icon(Icons.logout),
+                  onPressed: _logout,
+                  tooltip: '로그아웃',
+                ),
+              ],
       ),
       body: SafeArea(
         child: RefreshIndicator(
@@ -1187,48 +1245,80 @@ class _LotteryPageState extends State<LotteryPage> {
                     ),
                   ],
                 ),
+                // 키오스크 모드 안내 배너
+                if (_kioskService.isKioskMode) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF3E0),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.primary, width: 1),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.tablet_android,
+                            color: AppColors.primary, size: 18),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '키오스크 연동 모드 — 포인트 충전/환전은 키오스크 화면을 이용하세요',
+                            style: TextStyle(
+                                fontSize: 12, color: AppColors.primaryDark),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
                 const SizedBox(height: 12),
 
-                // 충전 / 환전 버튼
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: _showChargeDialog,
-                        icon: const Icon(Icons.add_circle_outline, size: 18),
-                        label: const Text('포인트 충전'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.secondary,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                // 충전 / 환전 버튼 (키오스크 모드에서는 키오스크가 관리)
+                if (!_kioskService.isKioskMode) ...[
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: _showChargeDialog,
+                          icon: const Icon(Icons.add_circle_outline, size: 18),
+                          label: const Text('포인트 충전'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.secondary,
+                            foregroundColor: Colors.white,
+                            padding:
+                                const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 0,
                           ),
-                          elevation: 0,
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: _showWithdrawDialog,
-                        icon:
-                            const Icon(Icons.remove_circle_outline, size: 18),
-                        label: const Text('포인트 환전'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: _showWithdrawDialog,
+                          icon: const Icon(Icons.remove_circle_outline,
+                              size: 18),
+                          label: const Text('포인트 환전'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            padding:
+                                const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 0,
                           ),
-                          elevation: 0,
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ],
 
                 // 행운 도전 카드
                 Card(
@@ -1662,7 +1752,7 @@ class _LotteryPageState extends State<LotteryPage> {
       onTap: disabled ? null : () => _conductDraw(betAmount),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(vertical: 20),
+        padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
           color: disabled ? const Color(0xFFF0F0F0) : surfaceColor,
           borderRadius: BorderRadius.circular(14),
@@ -1676,12 +1766,12 @@ class _LotteryPageState extends State<LotteryPage> {
             Text(
               '${betAmount}P',
               style: TextStyle(
-                fontSize: 26,
+                fontSize: 20,
                 fontWeight: FontWeight.bold,
                 color: disabled ? AppColors.textHint : color,
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 2),
             Text(
               _isLoading
                   ? '처리중...'
@@ -1689,7 +1779,7 @@ class _LotteryPageState extends State<LotteryPage> {
                       ? '횟수 초과'
                       : '도전하기',
               style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 11,
                   color: disabled ? AppColors.textHint : AppColors.textSecondary),
             ),
           ],

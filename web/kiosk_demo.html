@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>키오스크 연동 데모 — 오늘의 행운</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      background: linear-gradient(135deg, #F5A623, #f7c56c);
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    header h1 { font-size: 18px; color: #fff; }
+    header span { font-size: 12px; color: rgba(255,255,255,0.8); }
+    .main {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+    /* ── iframe 영역 ── */
+    .frame-wrap {
+      flex: 1;
+      background: #000;
+      position: relative;
+    }
+    .frame-wrap iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+    .frame-label {
+      position: absolute;
+      top: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.6);
+      color: #fff;
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      pointer-events: none;
+    }
+    /* ── 컨트롤 패널 ── */
+    .panel {
+      width: 340px;
+      background: #16213e;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .panel-section {
+      padding: 16px;
+      border-bottom: 1px solid #0f3460;
+    }
+    .panel-section h2 {
+      font-size: 13px;
+      color: #F5A623;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 10px;
+    }
+    label { font-size: 12px; color: #aaa; display: block; margin-bottom: 4px; }
+    input[type=text], input[type=number] {
+      width: 100%;
+      padding: 8px 10px;
+      background: #0f3460;
+      border: 1px solid #1a4a80;
+      border-radius: 6px;
+      color: #eee;
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+    input:focus { outline: none; border-color: #F5A623; }
+    .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    button {
+      padding: 8px 14px;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: opacity 0.15s;
+    }
+    button:hover { opacity: 0.85; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-primary   { background: #F5A623; color: #fff; }
+    .btn-secondary { background: #34C98E; color: #fff; }
+    .btn-accent    { background: #5B9CF6; color: #fff; }
+    .btn-danger    { background: #e74c3c; color: #fff; }
+    .btn-gray      { background: #444; color: #eee; }
+    .status-dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #666;
+      margin-right: 6px;
+    }
+    .status-dot.connected { background: #34C98E; }
+    .status-dot.waiting   { background: #F5A623; }
+    /* ── 메시지 로그 ── */
+    .log-wrap {
+      flex: 1;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      padding: 12px 16px;
+    }
+    .log-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .log-header h2 { font-size: 13px; color: #F5A623; text-transform: uppercase; }
+    .log-header button { font-size: 11px; padding: 3px 8px; }
+    #log {
+      flex: 1;
+      overflow-y: auto;
+      background: #0a0a1a;
+      border-radius: 8px;
+      padding: 10px;
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      line-height: 1.6;
+    }
+    .log-entry { margin-bottom: 4px; }
+    .log-entry.sent    { color: #5B9CF6; }
+    .log-entry.recv    { color: #34C98E; }
+    .log-entry.info    { color: #aaa; }
+    .log-entry.error   { color: #e74c3c; }
+    .log-ts { color: #555; font-size: 10px; }
+    /* ── 퀵 가이드 ── */
+    .guide { padding: 12px 16px; border-top: 1px solid #0f3460; }
+    .guide h2 { font-size: 12px; color: #aaa; margin-bottom: 6px; }
+    .guide code {
+      font-size: 10px;
+      background: #0f3460;
+      border-radius: 4px;
+      padding: 2px 5px;
+      display: block;
+      color: #F5A623;
+      margin-bottom: 3px;
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🍀 키오스크 연동 데모</h1>
+  <span>오늘의 행운 — postMessage 브리지 테스트</span>
+  <span id="connStatus" style="margin-left:auto">
+    <span class="status-dot" id="dot"></span>
+    <span id="connText">대기 중</span>
+  </span>
+</header>
+
+<div class="main">
+  <!-- Flutter 웹 앱 iframe -->
+  <div class="frame-wrap">
+    <div class="frame-label">Flutter Web App (iframe)</div>
+    <iframe id="appFrame" src="about:blank"></iframe>
+  </div>
+
+  <!-- 키오스크 컨트롤 패널 -->
+  <div class="panel">
+
+    <!-- URL 설정 -->
+    <div class="panel-section">
+      <h2>앱 연결 설정</h2>
+      <label>Flutter 웹 URL</label>
+      <input type="text" id="appUrl"
+        value="http://localhost:5000/lucky-today/"
+        placeholder="https://youngjun1603.github.io/lucky-today/">
+      <label>사용자 ID (이메일)</label>
+      <input type="text" id="userId" value="user@demo.com" placeholder="user@demo.com">
+      <div class="btn-row">
+        <button class="btn-primary" onclick="loadApp()">앱 로드</button>
+        <button class="btn-gray" onclick="reloadApp()">새로고침</button>
+      </div>
+    </div>
+
+    <!-- 키오스크 제어 -->
+    <div class="panel-section">
+      <h2>키오스크 제어</h2>
+      <div class="btn-row" style="margin-bottom:8px">
+        <button class="btn-accent" onclick="sendInit()">KIOSK_INIT</button>
+        <button class="btn-gray"   onclick="sendHeartbeat()">HEARTBEAT</button>
+      </div>
+      <label>배팅 금액</label>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <input type="number" id="betAmount" value="5" min="1" style="width:80px">
+        <button class="btn-secondary" onclick="sendBet()">배팅 시작</button>
+      </div>
+      <button class="btn-primary" style="width:100%" onclick="sendFreeDraw()">
+        📺 광고 완료 → 무료 추첨 시작
+      </button>
+    </div>
+
+    <!-- 메시지 로그 -->
+    <div class="log-wrap">
+      <div class="log-header">
+        <h2>메시지 로그</h2>
+        <button class="btn-gray" onclick="clearLog()">지우기</button>
+      </div>
+      <div id="log"></div>
+    </div>
+
+    <!-- 퀵 가이드 -->
+    <div class="guide">
+      <h2>URL 파라미터 자동 로그인 예시</h2>
+      <code id="urlExample">/lucky-today/?kiosk=1&uid=user@demo.com</code>
+    </div>
+  </div>
+</div>
+
+<script>
+  const frame = document.getElementById('appFrame');
+  const dot   = document.getElementById('dot');
+  const connText = document.getElementById('connText');
+  let connected = false;
+
+  // ── 앱 로드 ──────────────────────────────────────────
+  function loadApp() {
+    const base  = document.getElementById('appUrl').value.replace(/\/$/, '');
+    const uid   = document.getElementById('userId').value.trim();
+    const url   = `${base}/?kiosk=1&uid=${encodeURIComponent(uid)}`;
+    document.getElementById('urlExample').textContent = url.replace(location.origin, '');
+    frame.src = url;
+    connected = false;
+    setStatus(false, '앱 로딩 중...');
+    log('info', `앱 로드: ${url}`);
+  }
+
+  function reloadApp() {
+    frame.src = frame.src;
+    connected = false;
+    setStatus(false, '재연결 중...');
+    log('info', '앱 새로고침');
+  }
+
+  // ── postMessage 전송 ──────────────────────────────────
+  function send(type, data = {}) {
+    const msg = JSON.stringify({ type, data });
+    frame.contentWindow?.postMessage(msg, '*');
+    log('sent', `↑ ${type}`, data);
+  }
+
+  function sendInit() {
+    send('KIOSK_INIT', {
+      kioskId: 'KIOSK-001',
+      userId: document.getElementById('userId').value.trim(),
+      timestamp: Date.now()
+    });
+  }
+
+  function sendFreeDraw() {
+    send('KIOSK_START_FREE_DRAW', {});
+  }
+
+  function sendBet() {
+    const amt = parseInt(document.getElementById('betAmount').value) || 5;
+    send('KIOSK_START_BET', { betAmount: amt });
+  }
+
+  function sendHeartbeat() {
+    send('KIOSK_HEARTBEAT', { timestamp: Date.now() });
+  }
+
+  // ── 수신 메시지 처리 ──────────────────────────────────
+  window.addEventListener('message', (e) => {
+    let parsed;
+    try { parsed = JSON.parse(e.data); } catch { return; }
+    if (!parsed.type || !parsed.type.startsWith('WEB_')) return;
+
+    log('recv', `↓ ${parsed.type}`, parsed.data);
+
+    if (parsed.type === 'WEB_READY') {
+      connected = true;
+      setStatus(true, '연결됨');
+    } else if (parsed.type === 'WEB_DRAW_COMPLETE') {
+      const d = parsed.data;
+      const msg = `${d.drawType === 'free' ? '무료' : `${d.betAmount}P 배팅`} → +${d.winAmount}P (${d.prizeLabel})${d.couponWon ? ' 🎁 쿠폰 당첨!' : ''}`;
+      showToast(msg);
+    } else if (parsed.type === 'WEB_BALANCE_UPDATE') {
+      const d = parsed.data;
+      log('info', `잔액 업데이트: 게임 ${d.gamePoints}P | 무료 ${d.remainingFreeDraws}회 | 배팅 ${d.remainingPaidDraws}회`);
+    } else if (parsed.type === 'WEB_ERROR') {
+      log('error', `오류: ${parsed.data.code} — ${parsed.data.message}`);
+    } else if (parsed.type === 'WEB_SESSION_EXPIRED') {
+      setStatus(false, '세션 만료');
+      log('error', '세션 만료 — 재로그인 필요');
+    }
+  });
+
+  // ── 유틸 ─────────────────────────────────────────────
+  function setStatus(ok, text) {
+    dot.className = 'status-dot' + (ok ? ' connected' : (text.includes('로딩') ? ' waiting' : ''));
+    connText.textContent = text;
+  }
+
+  function log(type, title, data) {
+    const el = document.getElementById('log');
+    const ts  = new Date().toLocaleTimeString('ko-KR', { hour12: false });
+    const entry = document.createElement('div');
+    entry.className = `log-entry ${type}`;
+    let text = `<span class="log-ts">[${ts}]</span> ${title}`;
+    if (data && Object.keys(data).length > 0) {
+      text += ` <span style="color:#666">${JSON.stringify(data)}</span>`;
+    }
+    entry.innerHTML = text;
+    el.appendChild(entry);
+    el.scrollTop = el.scrollHeight;
+  }
+
+  function clearLog() {
+    document.getElementById('log').innerHTML = '';
+  }
+
+  let toastTimer;
+  function showToast(msg) {
+    clearTimeout(toastTimer);
+    let t = document.getElementById('toast');
+    if (!t) {
+      t = document.createElement('div');
+      t.id = 'toast';
+      Object.assign(t.style, {
+        position: 'fixed', bottom: '20px', left: '50%',
+        transform: 'translateX(-50%)',
+        background: '#34C98E', color: '#fff',
+        padding: '10px 20px', borderRadius: '20px',
+        fontSize: '14px', fontWeight: '600',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+        zIndex: '9999', transition: 'opacity 0.3s'
+      });
+      document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    t.style.opacity = '1';
+    toastTimer = setTimeout(() => { t.style.opacity = '0'; }, 3000);
+  }
+
+  // 초기 안내
+  log('info', '앱 URL을 입력하고 [앱 로드] 버튼을 누르세요');
+  log('info', 'WEB_READY 수신 시 연결 상태가 녹색으로 바뀝니다');
+</script>
+</body>
+</html>
