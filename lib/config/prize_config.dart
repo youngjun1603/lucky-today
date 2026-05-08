@@ -70,3 +70,23 @@ const List<PrizeStructure> prizeStructure = [
 double probabilitySum() {
   return prizeStructure.fold(0.0, (sum, prize) => sum + prize.probability);
 }
+
+// 할인권 룰렛 — 섹션 표시용 (확률/배수는 내부 로직과 무관, 색상만 사용)
+const List<PrizeStructure> discountPrizeStructure = [
+  PrizeStructure(range: '1-2 포인트',   displayName: '꽝',   probability: 40.0, multiplier: 0.2,  color: '#BDC3C7'),
+  PrizeStructure(range: '3-5 포인트',   displayName: '3%',   probability: 30.0, multiplier: 0.5,  color: '#5B9CF6'),
+  PrizeStructure(range: '5-10 포인트',  displayName: '5%',   probability: 15.0, multiplier: 1.0,  color: '#34C98E'),
+  PrizeStructure(range: '20-50 포인트', displayName: '10%',  probability: 10.0, multiplier: 4.0,  color: '#F5A623'),
+  PrizeStructure(range: '100 포인트',   displayName: '20%',  probability: 4.0,  multiplier: 10.0, color: '#A55EEA'),
+  PrizeStructure(range: '500 포인트',   displayName: '30%',  probability: 1.0,  multiplier: 50.0, color: '#FF4757'),
+];
+
+// 경품당첨 룰렛 — 섹션 표시용
+const List<PrizeStructure> giftPrizeStructure = [
+  PrizeStructure(range: '1-2 포인트',   displayName: '꽝',    probability: 40.0, multiplier: 0.2,  color: '#BDC3C7'),
+  PrizeStructure(range: '3-5 포인트',   displayName: '음료',  probability: 30.0, multiplier: 0.5,  color: '#5B9CF6'),
+  PrizeStructure(range: '5-10 포인트',  displayName: '간식',  probability: 15.0, multiplier: 1.0,  color: '#34C98E'),
+  PrizeStructure(range: '20-50 포인트', displayName: '상품권', probability: 10.0, multiplier: 4.0,  color: '#F5A623'),
+  PrizeStructure(range: '100 포인트',   displayName: '가전',  probability: 4.0,  multiplier: 10.0, color: '#A55EEA'),
+  PrizeStructure(range: '500 포인트',   displayName: 'JACKPOT', probability: 1.0, multiplier: 50.0, color: '#FF4757'),
+];

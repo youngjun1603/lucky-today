@@ -7,11 +7,14 @@ import '../services/sound_service.dart';
 class RouletteWidget extends StatefulWidget {
   final int winningIndex;
   final VoidCallback onSpinComplete;
+  // 'discount' = 할인권, 'gift' = 경품, 그 외 = 기본
+  final String drawType;
 
   const RouletteWidget({
     super.key,
     required this.winningIndex,
     required this.onSpinComplete,
+    this.drawType = 'gift',
   });
 
   @override
@@ -80,6 +83,20 @@ class _RouletteWidgetState extends State<RouletteWidget>
 
   @override
   Widget build(BuildContext context) {
+    final sectionData = widget.drawType == 'discount'
+        ? discountPrizeStructure
+        : widget.drawType == 'gift'
+            ? giftPrizeStructure
+            : prizeStructure;
+
+    final titleEmoji = widget.drawType == 'discount' ? '🏷️' : '🎁';
+    final titleText = widget.drawType == 'discount'
+        ? '할인권 룰렛'
+        : widget.drawType == 'gift'
+            ? '경품 룰렛'
+            : '오늘의 행운 룰렛';
+    final centerEmoji = widget.drawType == 'discount' ? '🏷️' : '🎁';
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final availableWidth = constraints.maxWidth > 0
@@ -116,22 +133,22 @@ class _RouletteWidgetState extends State<RouletteWidget>
                     ),
                   ],
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text('🍀', style: TextStyle(fontSize: 22)),
-                    SizedBox(width: 10),
+                    Text(titleEmoji, style: const TextStyle(fontSize: 22)),
+                    const SizedBox(width: 10),
                     Text(
-                      '오늘의 행운 룰렛',
-                      style: TextStyle(
+                      titleText,
+                      style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
                         letterSpacing: 1,
                       ),
                     ),
-                    SizedBox(width: 10),
-                    Text('🍀', style: TextStyle(fontSize: 22)),
+                    const SizedBox(width: 10),
+                    Text(titleEmoji, style: const TextStyle(fontSize: 22)),
                   ],
                 ),
               ),
@@ -181,7 +198,7 @@ class _RouletteWidgetState extends State<RouletteWidget>
                             Border.all(color: AppColors.primaryLight, width: 3),
                       ),
                       child: CustomPaint(
-                        painter: _RoulettePainter(prizeStructure),
+                        painter: _RoulettePainter(sectionData),
                       ),
                     ),
                   ),
@@ -206,7 +223,7 @@ class _RouletteWidgetState extends State<RouletteWidget>
                     ),
                     child: Center(
                       child: Text(
-                        '🍀',
+                        centerEmoji,
                         style: TextStyle(fontSize: wheelSize * 0.1),
                       ),
                     ),

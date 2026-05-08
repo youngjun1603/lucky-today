@@ -138,6 +138,8 @@ class _LotteryPageState extends State<LotteryPage> {
 
     setState(() => _isLoading = true);
 
+    final drawType = betAmount == _betPoint1 ? 'discount' : 'gift';
+
     try {
       final result = await _dbService.conductDraw(_currentUser!.id, betAmount);
       final draw = Draw.fromJson(result['draw']);
@@ -166,6 +168,7 @@ class _LotteryPageState extends State<LotteryPage> {
               ),
               child: RouletteWidget(
                 winningIndex: winningIndex,
+                drawType: drawType,
                 onSpinComplete: () {
                   Navigator.pop(context);
                   _notifyKioskDrawComplete(draw, 'bet');
@@ -514,22 +517,21 @@ class _LotteryPageState extends State<LotteryPage> {
                   tooltip: '결과 공유',
                   onPressed: () => _shareDrawResult(draw, isFree: true),
                 ),
-                if (draw.externalName != null)
-                  TextButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              CouponBoxPage(userId: _currentUser!.id),
-                        ),
-                      ).then((_) => _loadData());
-                    },
-                    icon: const Icon(Icons.card_giftcard,
-                        color: AppColors.secondary),
-                    label: const Text('쿠폰함 보기',
-                        style: TextStyle(color: AppColors.secondary)),
-                  ),
+                TextButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            CouponBoxPage(userId: _currentUser!.id),
+                      ),
+                    ).then((_) => _loadData());
+                  },
+                  icon: const Icon(Icons.card_giftcard_outlined,
+                      color: AppColors.secondary),
+                  label: const Text('쿠폰함',
+                      style: TextStyle(color: AppColors.secondary)),
+                ),
                 TextButton(
                   onPressed: () => Navigator.pop(context),
                   child: const Text('확인',
@@ -707,22 +709,21 @@ class _LotteryPageState extends State<LotteryPage> {
                   tooltip: '결과 공유',
                   onPressed: () => _shareDrawResult(draw, isFree: false),
                 ),
-                if (draw.externalName != null)
-                  TextButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              CouponBoxPage(userId: _currentUser!.id),
-                        ),
-                      ).then((_) => _loadData());
-                    },
-                    icon: const Icon(Icons.card_giftcard,
-                        color: AppColors.secondary),
-                    label: const Text('쿠폰함 보기',
-                        style: TextStyle(color: AppColors.secondary)),
-                  ),
+                TextButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            CouponBoxPage(userId: _currentUser!.id),
+                      ),
+                    ).then((_) => _loadData());
+                  },
+                  icon: const Icon(Icons.card_giftcard_outlined,
+                      color: AppColors.secondary),
+                  label: const Text('쿠폰함',
+                      style: TextStyle(color: AppColors.secondary)),
+                ),
                 TextButton(
                   onPressed: () => Navigator.pop(context),
                   child: const Text('확인',
