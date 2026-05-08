@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../config/prize_config.dart';
 import '../config/app_colors.dart';
 
@@ -22,6 +23,8 @@ class _RouletteWidgetState extends State<RouletteWidget>
   late AnimationController _controller;
   late Animation<double> _animation;
   bool _isSpinning = false;
+  int _lastTickSection = -1;
+  DateTime _lastSoundTime = DateTime.fromMillisecondsSinceEpoch(0);
 
   @override
   void initState() {
@@ -39,6 +42,20 @@ class _RouletteWidgetState extends State<RouletteWidget>
     super.dispose();
   }
 
+  void _onSpinTick() {
+    final section = (_animation.value / 60.0).floor();
+    if (section == _lastTickSection) return;
+    _lastTickSection = section;
+
+    // 최소 80ms 간격으로 클릭음 (빠른 구간에서 과도한 사운드 방지)
+    final now = DateTime.now();
+    if (now.difference(_lastSoundTime).inMilliseconds < 80) return;
+    _lastSoundTime = now;
+
+    SystemSound.play(SystemSoundType.click);
+    HapticFeedback.selectionClick();
+  }
+
   void _startSpin() {
     if (_isSpinning) return;
     setState(() => _isSpinning = true);
@@ -52,7 +69,10 @@ class _RouletteWidgetState extends State<RouletteWidget>
       CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
     );
 
+    _animation.addListener(_onSpinTick);
+
     _controller.forward().then((_) {
+      HapticFeedback.heavyImpact();
       Future.delayed(const Duration(milliseconds: 500), () {
         if (mounted) widget.onSpinComplete();
       });
