@@ -480,8 +480,10 @@ class _LotteryPageState extends State<LotteryPage> {
                 ),
               ),
             ],
-            const SizedBox(height: 16),
-            _buildBarcodeSection(draw),
+            if (_prizeLabel(draw) != '꽝') ...[
+              const SizedBox(height: 16),
+              _buildBarcodeSection(draw),
+            ],
           ],
         ),
         actions: _kioskService.isKioskMode
@@ -687,8 +689,10 @@ class _LotteryPageState extends State<LotteryPage> {
                 ),
               ),
             ],
-            const SizedBox(height: 16),
-            _buildBarcodeSection(draw),
+            if (_prizeLabel(draw) != '꽝') ...[
+              const SizedBox(height: 16),
+              _buildBarcodeSection(draw),
+            ],
           ],
         ),
         actions: _kioskService.isKioskMode
