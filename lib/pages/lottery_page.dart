@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:barcode_widget/barcode_widget.dart';
 import '../services/sound_service.dart';
@@ -32,17 +31,15 @@ class _LotteryPageState extends State<LotteryPage> {
 
   User? _currentUser;
   List<Draw> _drawHistory = [];
-  int? _externalBalance;
   int _remainingDraws = 5;
   int _maxDailyDraws = 5;
   int _betPoint1 = 5;
-  int _betPoint2 = 10;
+  int _betPoint2 = 100;
   List<Map<String, dynamic>> _todayTopWinners = [];
   int _remainingFreeDraws = 3;
   int _maxFreeDraws = 3;
   bool _isLoading = false;
   bool _isInitializing = true;
-  bool _isLoadingExternal = false;
 
   StreamSubscription<KioskMessage>? _kioskSub;
 
@@ -63,7 +60,6 @@ class _LotteryPageState extends State<LotteryPage> {
     if (!mounted) return;
     switch (msg.type) {
       case 'KIOSK_START_FREE_DRAW':
-        // 키오스크에서 광고 시청 완료 신호 → 광고 다이얼로그 없이 바로 무료 추첨
         if (_remainingFreeDraws > 0 && !_isLoading) _conductFreeDraw();
         break;
       case 'KIOSK_START_BET':
@@ -71,7 +67,6 @@ class _LotteryPageState extends State<LotteryPage> {
         if (!_isLoading) _conductDraw(bet);
         break;
       case 'KIOSK_INIT':
-        // 사용자 세션 갱신 요청
         _loadData();
         break;
     }
@@ -80,7 +75,6 @@ class _LotteryPageState extends State<LotteryPage> {
   void _notifyKioskDrawComplete(Draw draw, String drawType) {
     if (!_kioskService.isKioskMode) return;
     final current = _currentUser?.points ?? 0;
-    // 스핀 직후이므로 DB 반영 전 추정값 전송, 이후 WEB_BALANCE_UPDATE로 정확값 전달
     final estimated = drawType == 'free'
         ? current + draw.winAmount
         : current + draw.userNet;
@@ -119,45 +113,22 @@ class _LotteryPageState extends State<LotteryPage> {
       _remainingDraws = drawStatus['remaining'] ?? 5;
       _maxDailyDraws = drawStatus['max'] ?? 5;
       _betPoint1 = settings['betPoint1'] ?? 5;
-      _betPoint2 = settings['betPoint2'] ?? 10;
+      _betPoint2 = settings['betPoint2'] ?? 100;
       _todayTopWinners = topWinners;
       _remainingFreeDraws = freeDrawStatus['remaining'] ?? 3;
       _maxFreeDraws = freeDrawStatus['max'] ?? 3;
       _isInitializing = false;
     });
 
-    // 키오스크에 최신 잔액/횟수 동기화
     _kioskService.sendBalanceUpdate(
       gamePoints: user.points,
       remainingFreeDraws: (freeDrawStatus['remaining'] as int?) ?? 3,
       remainingPaidDraws: (drawStatus['remaining'] as int?) ?? 5,
     );
-
-    _loadExternalBalance();
-  }
-
-  Future<void> _loadExternalBalance() async {
-    if (_currentUser == null) return;
-    setState(() => _isLoadingExternal = true);
-    try {
-      final balance =
-          await _dbService.getExternalPointBalance(_currentUser!.id);
-      setState(() {
-        _externalBalance = balance;
-        _isLoadingExternal = false;
-      });
-    } catch (e) {
-      setState(() => _isLoadingExternal = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('외부 포인트 조회 실패: $e')),
-        );
-      }
-    }
   }
 
   Future<void> _conductDraw(int betAmount) async {
-    SoundService().init(); // 사용자 제스처 컨텍스트에서 Web Audio 활성화
+    SoundService().init();
     if (_currentUser == null) return;
 
     if (_currentUser!.points < betAmount) {
@@ -243,11 +214,11 @@ class _LotteryPageState extends State<LotteryPage> {
                 color: AppColors.accentSurface,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Column(
+              child: const Column(
                 children: [
-                  const Icon(Icons.videocam, color: AppColors.accent, size: 36),
-                  const SizedBox(height: 8),
-                  const Text(
+                  Icon(Icons.videocam, color: AppColors.accent, size: 36),
+                  SizedBox(height: 8),
+                  Text(
                     '15초 광고를 시청하면\n포인트 없이 무료로 도전할 수 있어요!',
                     textAlign: TextAlign.center,
                     style: TextStyle(
@@ -307,7 +278,7 @@ class _LotteryPageState extends State<LotteryPage> {
   }
 
   Future<void> _conductFreeDraw() async {
-    SoundService().init(); // 사용자 제스처 컨텍스트에서 Web Audio 활성화
+    SoundService().init();
     if (_currentUser == null) return;
 
     setState(() => _isLoading = true);
@@ -783,288 +754,6 @@ class _LotteryPageState extends State<LotteryPage> {
     );
   }
 
-  void _showChargeDialog() {
-    final amountController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.bgCard,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
-          children: [
-            Icon(Icons.add_circle, color: AppColors.secondary),
-            SizedBox(width: 8),
-            Text('포인트 충전',
-                style: TextStyle(color: AppColors.textPrimary)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '외부 포인트: ${_externalBalance != null ? _numberFormat.format(_externalBalance!) : '---'}P',
-              style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.accent),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: amountController,
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              decoration: InputDecoration(
-                labelText: '충전할 금액',
-                suffixText: 'P',
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12)),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide:
-                      const BorderSide(color: AppColors.secondary, width: 2),
-                ),
-                helperText: '외부 포인트 → 게임 포인트로 전환',
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text('1:1 비율로 전환됩니다',
-                style:
-                    TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('취소',
-                style: TextStyle(color: AppColors.textSecondary)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final amount = int.tryParse(amountController.text);
-              if (amount == null || amount <= 0) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('올바른 금액을 입력하세요')),
-                );
-                return;
-              }
-              Navigator.pop(context);
-              await _chargePoints(amount);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.secondary,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-            ),
-            child: const Text('충전하기'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _chargePoints(int amount) async {
-    if (_currentUser == null) return;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const AlertDialog(
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(color: AppColors.secondary),
-            SizedBox(height: 16),
-            Text('외부 포인트사와 통신 중...'),
-          ],
-        ),
-      ),
-    );
-
-    try {
-      await _dbService.chargePoints(_currentUser!.id, amount);
-      if (mounted) {
-        Navigator.pop(context);
-        await _loadData();
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20)),
-            title: const Row(
-              children: [
-                Icon(Icons.check_circle, color: AppColors.secondary),
-                SizedBox(width: 8),
-                Text('충전 완료'),
-              ],
-            ),
-            content: Text('${_numberFormat.format(amount)}P가 충전되었습니다!',
-                style: const TextStyle(fontSize: 16)),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('확인',
-                    style: TextStyle(color: AppColors.primary)),
-              ),
-            ],
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        Navigator.pop(context);
-        _showError('충전 실패: $e');
-      }
-    }
-  }
-
-  void _showWithdrawDialog() {
-    final amountController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.bgCard,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
-          children: [
-            Icon(Icons.remove_circle, color: AppColors.primary),
-            SizedBox(width: 8),
-            Text('포인트 환전',
-                style: TextStyle(color: AppColors.textPrimary)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '현재 포인트: ${_numberFormat.format(_currentUser?.points ?? 0)}P',
-              style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.primary),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: amountController,
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              decoration: InputDecoration(
-                labelText: '환전할 금액',
-                suffixText: 'P',
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12)),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide:
-                      const BorderSide(color: AppColors.primary, width: 2),
-                ),
-                helperText: '게임 포인트 → 외부 포인트로 전환',
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text('1:1 비율로 전환됩니다',
-                style:
-                    TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('취소',
-                style: TextStyle(color: AppColors.textSecondary)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final amount = int.tryParse(amountController.text);
-              if (amount == null || amount <= 0) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('올바른 금액을 입력하세요')),
-                );
-                return;
-              }
-              if (amount > (_currentUser?.points ?? 0)) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('포인트가 부족합니다')),
-                );
-                return;
-              }
-              Navigator.pop(context);
-              await _withdrawPoints(amount);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-            ),
-            child: const Text('환전하기'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _withdrawPoints(int amount) async {
-    if (_currentUser == null) return;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const AlertDialog(
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(color: AppColors.primary),
-            SizedBox(height: 16),
-            Text('외부 포인트사와 통신 중...'),
-          ],
-        ),
-      ),
-    );
-
-    try {
-      await _dbService.withdrawPoints(_currentUser!.id, amount);
-      if (mounted) {
-        Navigator.pop(context);
-        await _loadData();
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20)),
-            title: const Row(
-              children: [
-                Icon(Icons.check_circle, color: AppColors.secondary),
-                SizedBox(width: 8),
-                Text('환전 완료'),
-              ],
-            ),
-            content: Text(
-              '${_numberFormat.format(amount)}P가 외부 포인트로 전환되었습니다!',
-              style: const TextStyle(fontSize: 16),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('확인',
-                    style: TextStyle(color: AppColors.primary)),
-              ),
-            ],
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        Navigator.pop(context);
-        _showError('환전 실패: $e');
-      }
-    }
-  }
-
   void _showKioskCouponDialog(Draw draw) {
     showDialog(
       context: context,
@@ -1229,7 +918,7 @@ class _LotteryPageState extends State<LotteryPage> {
         foregroundColor: Colors.white,
         elevation: 0,
         actions: _kioskService.isKioskMode
-            ? [] // 키오스크 모드: 세션은 키오스크가 관리하므로 네비게이션 숨김
+            ? []
             : [
                 IconButton(
                   icon: const Icon(Icons.card_giftcard_outlined),
@@ -1280,122 +969,56 @@ class _LotteryPageState extends State<LotteryPage> {
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                // 포인트 현황 (2열 그리드)
-                Row(
-                  children: [
-                    // 게임 포인트
-                    Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.all(18),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [AppColors.primary, AppColors.primaryLight],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
+                // 게임 포인트 (전체 폭)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [AppColors.primary, AppColors.primaryLight],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withOpacity(0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.account_balance_wallet,
+                              color: Colors.white, size: 22),
+                          SizedBox(width: 8),
+                          Text(
+                            '게임 포인트',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.primary.withOpacity(0.3),
-                              blurRadius: 12,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                const Icon(Icons.account_balance_wallet,
-                                    color: Colors.white, size: 18),
-                                const SizedBox(width: 6),
-                                Text(
-                                  '게임 포인트',
-                                  style: TextStyle(
-                                    color: Colors.white.withOpacity(0.9),
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              '${_numberFormat.format(_currentUser!.points)}P',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 26,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
+                        ],
+                      ),
+                      Text(
+                        '${_numberFormat.format(_currentUser!.points)}P',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    // 외부 포인트
-                    Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.all(18),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [AppColors.accent, Color(0xFF3D84F7)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.accent.withOpacity(0.3),
-                              blurRadius: 12,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                const Icon(Icons.swap_horiz,
-                                    color: Colors.white, size: 18),
-                                const SizedBox(width: 6),
-                                Text(
-                                  '외부 포인트',
-                                  style: TextStyle(
-                                      color: Colors.white.withOpacity(0.9),
-                                      fontSize: 13),
-                                ),
-                                if (_isLoadingExternal) ...[
-                                  const SizedBox(width: 4),
-                                  const SizedBox(
-                                    width: 12,
-                                    height: 12,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 1.5,
-                                      valueColor:
-                                          AlwaysStoppedAnimation(Colors.white),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              _externalBalance != null
-                                  ? '${_numberFormat.format(_externalBalance!)}P'
-                                  : '---P',
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 26,
-                                  fontWeight: FontWeight.bold),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
+
                 // 키오스크 모드 안내 배너
                 if (_kioskService.isKioskMode) ...[
                   const SizedBox(height: 12),
@@ -1414,7 +1037,7 @@ class _LotteryPageState extends State<LotteryPage> {
                         SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            '키오스크 연동 모드 — 포인트 충전/환전은 키오스크 화면을 이용하세요',
+                            '키오스크 연동 모드',
                             style: TextStyle(
                                 fontSize: 12, color: AppColors.primaryDark),
                           ),
@@ -1424,52 +1047,7 @@ class _LotteryPageState extends State<LotteryPage> {
                   ),
                 ],
 
-                const SizedBox(height: 12),
-
-                // 충전 / 환전 버튼 (키오스크 모드에서는 키오스크가 관리)
-                if (!_kioskService.isKioskMode) ...[
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: _showChargeDialog,
-                          icon: const Icon(Icons.add_circle_outline, size: 18),
-                          label: const Text('포인트 충전'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.secondary,
-                            foregroundColor: Colors.white,
-                            padding:
-                                const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            elevation: 0,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: _showWithdrawDialog,
-                          icon: const Icon(Icons.remove_circle_outline,
-                              size: 18),
-                          label: const Text('포인트 환전'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                            padding:
-                                const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            elevation: 0,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                ],
+                const SizedBox(height: 16),
 
                 // 행운 도전 카드
                 Card(
@@ -1501,7 +1079,7 @@ class _LotteryPageState extends State<LotteryPage> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 const Text(
-                                  '행운 도전하기',
+                                  '도전하기',
                                   style: TextStyle(
                                       fontSize: 18,
                                       fontWeight: FontWeight.bold,
@@ -1520,21 +1098,32 @@ class _LotteryPageState extends State<LotteryPage> {
                           ],
                         ),
                         const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildBetButton(_betPoint1,
-                                  AppColors.primary, AppColors.primarySurface),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _buildBetButton(_betPoint2,
-                                  AppColors.secondary, AppColors.secondarySurface),
-                            ),
-                          ],
+
+                        // 1. 할인권 (5P)
+                        _buildBetButton(
+                          betAmount: _betPoint1,
+                          label: '할인권',
+                          sublabel: '${_betPoint1}P 도전',
+                          color: AppColors.primary,
+                          surfaceColor: AppColors.primarySurface,
+                          icon: Icons.local_offer_outlined,
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 10),
+
+                        // 2. 경품당첨 (100P)
+                        _buildBetButton(
+                          betAmount: _betPoint2,
+                          label: '경품당첨',
+                          sublabel: '${_betPoint2}P 도전',
+                          color: AppColors.secondary,
+                          surfaceColor: AppColors.secondarySurface,
+                          icon: Icons.card_giftcard_outlined,
+                        ),
+                        const SizedBox(height: 10),
+
+                        // 3. 광고보기 (무료 도전)
                         _buildFreeDrawButton(),
+
                         const SizedBox(height: 10),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -1579,12 +1168,12 @@ class _LotteryPageState extends State<LotteryPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
+                        const Row(
                           children: [
-                            const Icon(Icons.emoji_events,
+                            Icon(Icons.emoji_events,
                                 color: AppColors.primary),
-                            const SizedBox(width: 8),
-                            const Text(
+                            SizedBox(width: 8),
+                            Text(
                               '오늘의 행운의 주인공들',
                               style: TextStyle(
                                   fontSize: 16,
@@ -1887,7 +1476,7 @@ class _LotteryPageState extends State<LotteryPage> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 14),
+        padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
           color: disabled ? const Color(0xFFF0F0F0) : AppColors.accentSurface,
           borderRadius: BorderRadius.circular(14),
@@ -1902,18 +1491,33 @@ class _LotteryPageState extends State<LotteryPage> {
             Icon(
               noFreeDraws ? Icons.videocam_off : Icons.videocam,
               color: disabled ? AppColors.textHint : AppColors.accent,
-              size: 20,
+              size: 22,
             ),
             const SizedBox(width: 8),
-            Text(
-              noFreeDraws
-                  ? '오늘 무료 도전 횟수를 모두 사용했습니다'
-                  : '광고 보고 무료 도전  ($_remainingFreeDraws/$_maxFreeDraws)',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: disabled ? AppColors.textHint : AppColors.accent,
-              ),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '광고보기',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: disabled ? AppColors.textHint : AppColors.accent,
+                  ),
+                ),
+                Text(
+                  noFreeDraws
+                      ? '오늘 무료 도전 횟수를 모두 사용했습니다'
+                      : '무료 도전  ($_remainingFreeDraws/$_maxFreeDraws)',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: disabled
+                        ? AppColors.textHint
+                        : AppColors.accent.withOpacity(0.8),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -1921,13 +1525,21 @@ class _LotteryPageState extends State<LotteryPage> {
     );
   }
 
-  Widget _buildBetButton(int betAmount, Color color, Color surfaceColor) {
+  Widget _buildBetButton({
+    required int betAmount,
+    required String label,
+    required String sublabel,
+    required Color color,
+    required Color surfaceColor,
+    required IconData icon,
+  }) {
     final bool disabled = _isLoading || _remainingDraws <= 0;
     return GestureDetector(
       onTap: disabled ? null : () => _conductDraw(betAmount),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
         decoration: BoxDecoration(
           color: disabled ? const Color(0xFFF0F0F0) : surfaceColor,
           borderRadius: BorderRadius.circular(14),
@@ -1936,26 +1548,48 @@ class _LotteryPageState extends State<LotteryPage> {
             width: 2,
           ),
         ),
-        child: Column(
+        child: Row(
           children: [
+            Icon(
+              icon,
+              color: disabled ? AppColors.textHint : color,
+              size: 24,
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: disabled ? AppColors.textHint : color,
+                    ),
+                  ),
+                  Text(
+                    _isLoading
+                        ? '처리중...'
+                        : _remainingDraws <= 0
+                            ? '오늘 횟수 초과'
+                            : sublabel,
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: disabled
+                            ? AppColors.textHint
+                            : AppColors.textSecondary),
+                  ),
+                ],
+              ),
+            ),
             Text(
-              '${betAmount}P',
+              '${_numberFormat.format(betAmount)}P',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
                 color: disabled ? AppColors.textHint : color,
               ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              _isLoading
-                  ? '처리중...'
-                  : _remainingDraws <= 0
-                      ? '횟수 초과'
-                      : '도전하기',
-              style: TextStyle(
-                  fontSize: 11,
-                  color: disabled ? AppColors.textHint : AppColors.textSecondary),
             ),
           ],
         ),

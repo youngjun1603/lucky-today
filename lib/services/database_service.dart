@@ -29,7 +29,7 @@ class DatabaseService {
 
   // 시스템 설정
   static int _betPoint1 = 5;
-  static int _betPoint2 = 10;
+  static int _betPoint2 = 100;
   static int _maxDailyDraws = 5;
 
   // 광고 시청 무료 추첨 (하루 최대 3회, paid 횟수와 별도)
@@ -168,7 +168,7 @@ class DatabaseService {
 
       // 시스템 설정 로드
       _betPoint1 = prefs.getInt('betPoint1') ?? 5;
-      _betPoint2 = prefs.getInt('betPoint2') ?? 10;
+      _betPoint2 = prefs.getInt('betPoint2') ?? 100;
       _maxDailyDraws = prefs.getInt('maxDailyDraws') ?? 5;
 
       // 무료 추첨 횟수 로드
