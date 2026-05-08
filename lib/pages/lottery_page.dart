@@ -387,22 +387,36 @@ class _LotteryPageState extends State<LotteryPage> {
                     ],
                   ),
                   const Divider(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('획득 포인트',
-                          style: TextStyle(
-                              fontSize: 14, color: AppColors.textSecondary)),
-                      Text(
-                        '${NumberFormat('#,###').format(draw.winAmount)}P',
-                        style: const TextStyle(
-                          color: AppColors.accent,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 24,
+                  const SizedBox(height: 8),
+                  Center(
+                    child: Column(
+                      children: [
+                        Text(
+                          _prizeEmoji(draw),
+                          style: const TextStyle(fontSize: 42),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 10),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 24, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: _prizeSectionColor(draw),
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          child: Text(
+                            _prizeLabel(draw),
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
+                  const SizedBox(height: 8),
                 ],
               ),
             ),
@@ -593,23 +607,37 @@ class _LotteryPageState extends State<LotteryPage> {
                       ),
                     ],
                   ),
-                  const Divider(height: 24),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('획득 포인트',
-                          style: TextStyle(
-                              fontSize: 14, color: AppColors.textSecondary)),
-                      Text(
-                        '${_numberFormat.format(draw.winAmount)}P',
-                        style: const TextStyle(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 24,
+                  const Divider(height: 20),
+                  const SizedBox(height: 8),
+                  Center(
+                    child: Column(
+                      children: [
+                        Text(
+                          _prizeEmoji(draw),
+                          style: const TextStyle(fontSize: 42),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 10),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 24, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: _prizeSectionColor(draw),
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          child: Text(
+                            _prizeLabel(draw),
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
+                  const SizedBox(height: 8),
                 ],
               ),
             ),
@@ -864,6 +892,34 @@ class _LotteryPageState extends State<LotteryPage> {
         ],
       ),
     );
+  }
+
+  int _prizeIndex(Draw draw) {
+    for (int i = 0; i < prizeStructure.length; i++) {
+      if (prizeStructure[i].range == draw.prizeRange) return i;
+    }
+    return 0;
+  }
+
+  String _prizeLabel(Draw draw) {
+    final idx = _prizeIndex(draw);
+    if (draw.betAmount == _betPoint1) return discountPrizeStructure[idx].displayName;
+    if (draw.betAmount == _betPoint2) return giftPrizeStructure[idx].displayName;
+    return prizeStructure[idx].displayName;
+  }
+
+  Color _prizeSectionColor(Draw draw) {
+    final hex = prizeStructure[_prizeIndex(draw)].color.replaceAll('#', '');
+    return Color(int.parse('FF$hex', radix: 16));
+  }
+
+  String _prizeEmoji(Draw draw) {
+    final label = _prizeLabel(draw);
+    if (label == '꽝') return '😅';
+    if (label == 'JACKPOT') return '🎉';
+    if (draw.betAmount == _betPoint1) return '🏷️';
+    if (draw.betAmount == _betPoint2) return '🎁';
+    return '🍀';
   }
 
   void _showConfetti() {
