@@ -413,6 +413,25 @@ class _LotteryPageState extends State<LotteryPage> {
                             ),
                           ),
                         ),
+                        if (draw.externalValue != null &&
+                            draw.externalValue! > 0) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            '${_numberFormat.format(draw.externalValue!)}원 상당',
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.secondaryDark,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          const Text(
+                            '쿠폰함에서 코드를 확인하세요',
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textSecondary),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -434,52 +453,6 @@ class _LotteryPageState extends State<LotteryPage> {
                 ),
               ],
             ),
-            if (draw.externalName != null) ...[
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [AppColors.secondarySurface, Color(0xFFD5F5E9)],
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.secondary, width: 2),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.card_giftcard,
-                        color: AppColors.secondary, size: 32),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            '특별 경품 당첨!',
-                            style: TextStyle(
-                                color: AppColors.secondaryDark,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '${draw.externalName}',
-                            style: const TextStyle(
-                                color: AppColors.secondaryDark, fontSize: 14),
-                          ),
-                          const SizedBox(height: 4),
-                          const Text(
-                            '쿠폰함에서 코드를 확인하세요',
-                            style: TextStyle(
-                                color: AppColors.textSecondary, fontSize: 12),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
             if (_prizeLabel(draw) != '꽝') ...[
               const SizedBox(height: 16),
               _buildBarcodeSection(draw),
@@ -636,6 +609,25 @@ class _LotteryPageState extends State<LotteryPage> {
                             ),
                           ),
                         ),
+                        if (draw.externalValue != null &&
+                            draw.externalValue! > 0) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            '${_numberFormat.format(draw.externalValue!)}원 상당',
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.secondaryDark,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          const Text(
+                            '쿠폰함에서 코드를 확인하세요',
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textSecondary),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -643,52 +635,6 @@ class _LotteryPageState extends State<LotteryPage> {
                 ],
               ),
             ),
-            if (draw.externalName != null) ...[
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [AppColors.secondarySurface, Color(0xFFD5F5E9)],
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.secondary, width: 2),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.card_giftcard,
-                        color: AppColors.secondary, size: 32),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            '특별 경품 당첨!',
-                            style: TextStyle(
-                                color: AppColors.secondaryDark,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '${draw.externalName}',
-                            style: const TextStyle(
-                                color: AppColors.secondaryDark, fontSize: 14),
-                          ),
-                          const SizedBox(height: 4),
-                          const Text(
-                            '쿠폰함에서 코드를 확인하세요',
-                            style: TextStyle(
-                                color: AppColors.textSecondary, fontSize: 12),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
             if (_prizeLabel(draw) != '꽝') ...[
               const SizedBox(height: 16),
               _buildBarcodeSection(draw),
@@ -906,6 +852,7 @@ class _LotteryPageState extends State<LotteryPage> {
   }
 
   String _prizeLabel(Draw draw) {
+    if (draw.externalName != null) return draw.externalName!;
     final idx = _prizeIndex(draw);
     if (draw.betAmount == _betPoint1) return discountPrizeStructure[idx].displayName;
     if (draw.betAmount == _betPoint2) return giftPrizeStructure[idx].displayName;
@@ -918,6 +865,7 @@ class _LotteryPageState extends State<LotteryPage> {
   }
 
   String _prizeEmoji(Draw draw) {
+    if (draw.externalName != null) return '🎁';
     final label = _prizeLabel(draw);
     if (label == '꽝') return '😅';
     if (label == 'JACKPOT') return '🎉';
