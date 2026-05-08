@@ -12,6 +12,7 @@ import '../config/app_colors.dart';
 import 'package:share_plus/share_plus.dart';
 import '../widgets/roulette_widget.dart';
 import '../widgets/ad_reward_dialog.dart';
+import '../widgets/confetti_overlay.dart';
 import 'login_page.dart';
 import 'point_history_page.dart';
 import 'user_stats_page.dart';
@@ -333,6 +334,7 @@ class _LotteryPageState extends State<LotteryPage> {
   }
 
   void _showFreeDrawResult(Draw draw, int freeDrawsUsed, int maxFreeDraws) {
+    _showConfetti();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -545,6 +547,7 @@ class _LotteryPageState extends State<LotteryPage> {
   }
 
   void _showDrawResult(Draw draw) {
+    _showConfetti();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -861,6 +864,18 @@ class _LotteryPageState extends State<LotteryPage> {
         ],
       ),
     );
+  }
+
+  void _showConfetti() {
+    final overlay = Overlay.of(context);
+    late OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (_) => const Positioned.fill(child: ConfettiOverlay()),
+    );
+    overlay.insert(entry);
+    Future.delayed(const Duration(milliseconds: 2600), () {
+      if (entry.mounted) entry.remove();
+    });
   }
 
   void _showError(String message) {
